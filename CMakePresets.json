@@ -3,9 +3,21 @@
     "configurePresets": [
         {
             "name": "default-win11",
-            "displayName": "Configure preset using toolchain file",
+            "displayName": "Win11 default + Ninja",
             "description": "Sets Ninja generator, build and install directory",
-            "generator": "ninja",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+            }
+        },
+        {
+            "name": "arch-default",
+            "displayName": "Arch default + Ninja",
+            "description": "Sets Ninja generator, build and install directory",
+            "generator": "Ninja",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",

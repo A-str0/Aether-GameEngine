@@ -2,7 +2,24 @@ cmake_minimum_required(VERSION 3.10.0)
 
 project(Aether-GameEngine VERSION 0.1.0 LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-add_executable(Aether-GameEngine main.cpp)
+set(SOURCE_FILES
+    "src/core/gui/sdl/window_context_sdl.cpp"
+    "src/core/rendering/vulkan/renderer_vulkan.cpp"
+    "src/main.cpp"
+)
+
+add_executable(${PROJECT_NAME} ${SOURCE_FILES})
+
+find_package(Vulkan REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
+
+find_package(SDL2 CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+    $<TARGET_NAME_IF_EXISTS:SDL2::SDL2main>
+    $<IF:$<TARGET_EXISTS:SDL2::SDL2>,SDL2::SDL2,SDL2::SDL2-static>
+)
+
