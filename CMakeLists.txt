@@ -6,8 +6,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 set(SOURCE_FILES
-    "src/core/gui/sdl/window_context_sdl.cpp"
-    "src/core/rendering/vulkan/renderer_vulkan.cpp"
+    "src/core/window_context.cpp"
+    "src/core/rendering/vulkan/vulkan_context.cpp"
+    "src/core/rendering/vulkan/vulkan_device_context.cpp"
+    "src/core/rendering/vulkan/vulkan_swapchain_context.cpp"
     "src/main.cpp"
 )
 
