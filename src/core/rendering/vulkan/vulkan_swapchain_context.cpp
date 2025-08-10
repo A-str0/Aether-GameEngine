@@ -4,17 +4,18 @@
 #include <algorithm>
 
 namespace AetherEngine::Rendering {
-    VulkanSwapchainContext::VulkanSwapchainContext(VkDevice device, VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, SDL_Window* window) : _device(device) {
+    VulkanSwapchainContext::VulkanSwapchainContext(VulkanDeviceContext& deviceContext, VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, SDL_Window* window) : m_device(deviceContext.getDevice()) {
+        // TODO: VkSurfaceCapabilities2KHR capabilities
         VkSurfaceCapabilitiesKHR capabilities;
         if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities) != VK_SUCCESS) {
-            throw std::runtime_error("Не удалось получить возможности поверхности");
+            throw std::runtime_error("Failed to get Surface Capabilities");
         }
 
         // Get formats
         uint32_t formatCount;
         vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
         if (formatCount == 0) {
-            throw std::runtime_error("Нет доступных форматов поверхности");
+            throw std::runtime_error("No valid Surface Formats avaliable");
         }
         std::vector<VkSurfaceFormatKHR> formats(formatCount);
         vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, formats.data());
@@ -23,15 +24,15 @@ namespace AetherEngine::Rendering {
         uint32_t presentModeCount;
         vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, nullptr);
         if (presentModeCount == 0) {
-            throw std::runtime_error("Нет доступных режимов представления");
+            throw std::runtime_error("No valid Surface Present Modes avaliable");
         }
         std::vector<VkPresentModeKHR> presentModes(presentModeCount);
         vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, presentModes.data());
 
         VkSurfaceFormatKHR surfaceFormat = selectSurfaceFormat(formats);
         VkPresentModeKHR presentMode = selectPresentMode(presentModes);
-        _extent = selectExtent(capabilities, window);
-        _format = surfaceFormat.format;
+        m_extent = selectExtent(capabilities, window);
+        m_format = surfaceFormat.format;
 
         // Create swapchain
         VkSwapchainCreateInfoKHR createInfo{};
@@ -41,13 +42,12 @@ namespace AetherEngine::Rendering {
         // createInfo.minImageCount = std::clamp(capabilities.minImageCount + 1, capabilities.minImageCount, capabilities.maxImageCount);
         createInfo.imageFormat = surfaceFormat.format;
         createInfo.imageColorSpace = surfaceFormat.colorSpace;
-        createInfo.imageExtent = _extent;
+        createInfo.imageExtent = m_extent;
         createInfo.imageArrayLayers = 1;
         createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
         // Set queue families indicies
-        VulkanDeviceContext tempDevice(physicalDevice, surface); // TODO: use created?
-        uint32_t queueFamilyIndices[] = {tempDevice.getGraphicsFamily(), tempDevice.getPresentFamily()};
+        uint32_t queueFamilyIndices[] = {deviceContext.getGraphicsFamily(), deviceContext.getPresentFamily()};
         if (queueFamilyIndices[0] != queueFamilyIndices[1]) {
             createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
             createInfo.queueFamilyIndexCount = 2;
@@ -63,44 +63,49 @@ namespace AetherEngine::Rendering {
         createInfo.presentMode = presentMode;
         createInfo.clipped = VK_TRUE;
 
-        if (vkCreateSwapchainKHR(_device, &createInfo, nullptr, &_swapchain) != VK_SUCCESS) {
-            throw std::runtime_error("Не удалось создать свопчейн");
+        if (vkCreateSwapchainKHR(m_device, &createInfo, nullptr, &m_swapchain) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create swapchain");
         }
 
-        // Get swapchain  images
+        // Get swapchain images
         uint32_t imageCount;
-        vkGetSwapchainImagesKHR(_device, _swapchain, &imageCount, nullptr);
-        _images.resize(imageCount);
-        vkGetSwapchainImagesKHR(_device, _swapchain, &imageCount, _images.data());
+        vkGetSwapchainImagesKHR(m_device, m_swapchain, &imageCount, nullptr);
+        m_images.resize(imageCount);
+        vkGetSwapchainImagesKHR(m_device, m_swapchain, &imageCount, m_images.data());
 
         // Get image views
-        _imageViews.resize(imageCount);
+        m_imageViews.resize(imageCount);
         for (size_t i = 0; i < imageCount; ++i) {
             VkImageViewCreateInfo viewInfo{};
             viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            viewInfo.image = _images[i];
+            viewInfo.image = m_images[i];
             viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            viewInfo.format = _format;
+            viewInfo.format = m_format;
             viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             viewInfo.subresourceRange.baseMipLevel = 0;
             viewInfo.subresourceRange.levelCount = 1;
             viewInfo.subresourceRange.baseArrayLayer = 0;
             viewInfo.subresourceRange.layerCount = 1;
 
-            if (vkCreateImageView(_device, &viewInfo, nullptr, &_imageViews[i]) != VK_SUCCESS) {
-                throw std::runtime_error("Не удалось создать представление изображения для свопчейна");
+            if (vkCreateImageView(m_device, &viewInfo, nullptr, &m_imageViews[i]) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to create ImageView");
             }
         }
     }
 
+    // VulkanSwapchainContext::VulkanSwapchainContext(VulkanDeviceContext& deviceContext)
+    // {
+    //     // std::cout << deviceContext.getGraphicsQueue();
+    // }
+
     VulkanSwapchainContext::~VulkanSwapchainContext() {
-        for (auto imageView : _imageViews) {
+        for (auto imageView : m_imageViews) {
             if (imageView != VK_NULL_HANDLE) {
-                vkDestroyImageView(_device, imageView, nullptr);
+                vkDestroyImageView(m_device, imageView, nullptr);
             }
         }
-        if (_swapchain != VK_NULL_HANDLE) {
-            vkDestroySwapchainKHR(_device, _swapchain, nullptr);
+        if (m_swapchain != VK_NULL_HANDLE) {
+            vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
         }
     }
 

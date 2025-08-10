@@ -21,6 +21,8 @@ namespace AetherEngine {
         VkSurfaceKHR getSurface() { return m_surface; } 
         SDL_bool recreateSurface(const AetherEngine::Rendering::VulkanContext& context);
 
+        SDL_Window* getWindow() { return m_window; } 
+
         std::vector<const char*> getRequredExtensions();
 
         void handleEvents();

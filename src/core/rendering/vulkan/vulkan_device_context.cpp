@@ -4,7 +4,7 @@
 #include <string>
 
 namespace AetherEngine::Rendering {
-    VulkanDeviceContext::VulkanDeviceContext(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) {
+    VulkanDeviceContext::VulkanDeviceContext(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) : m_physicalDevice(physicalDevice) {
         m_indices = findQueueFamilies(physicalDevice, surface);
         if (m_indices.graphicsFamily == UINT32_MAX || m_indices.presentFamily == UINT32_MAX) {
             throw std::runtime_error("No queue families found for Graphics or Presentation");
