@@ -3,17 +3,37 @@
 #include <array>
 #include <fstream>
 #include <vector>
+#include <filesystem>
+#include <iostream>
 
 namespace AetherEngine::Rendering {
+    const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+
     std::vector<char> readShaderFile(const std::string& filename) {
-        std::ifstream file(filename, std::ios::ate | std::ios::binary);
-        if (!file.is_open()) {
-            throw std::runtime_error("Failed to open shader file: " + filename);
+        std::filesystem::path path = std::filesystem::absolute(filename);
+
+        std::cout << "CWD: " << std::filesystem::current_path().string() << "\n";
+        std::cout << "Trying to open: " << path.string() << "\n";
+
+        if (!std::filesystem::exists(path)) {
+            throw std::runtime_error("Shader file not found: " + path.string());
         }
-        size_t fileSize = (size_t)file.tellg();
+        std::ifstream file(path, std::ios::ate | std::ios::binary);
+        if (!file.is_open()) {
+            throw std::runtime_error("Failed to open shader file: " + path.string());
+        }
+        size_t fileSize = static_cast<size_t>(file.tellg());
+        if (fileSize == 0 || fileSize % 4 != 0) {
+            file.close();
+            throw std::runtime_error("Invalid SPIR-V size: " + path.string());
+        }
         std::vector<char> buffer(fileSize);
         file.seekg(0);
         file.read(buffer.data(), fileSize);
+        if (!file.good() || file.gcount() != static_cast<std::streamsize>(fileSize)) {
+            file.close();
+            throw std::runtime_error("Failed to read shader file: " + path.string());
+        }
         file.close();
         return buffer;
     }
@@ -22,8 +42,84 @@ namespace AetherEngine::Rendering {
         VulkanDeviceContext& deviceContext, 
         VulkanSwapchainContext& swapchainContext, 
         VkSurfaceKHR surface
-    ) : m_deviceContext(m_deviceContext), m_swapchainContext(swapchainContext) {
-        
+    ) : m_deviceContext(deviceContext), m_swapchainContext(swapchainContext) {
+
+        createRenderPass();
+        createShaderModules();
+        createPipeline();
+        createFramebuffers();
+        createCommandPool();
+        createCommandBuffers();
+        createSyncObjects();
+    }
+
+    Renderer::~Renderer() {
+        VkDevice device = m_deviceContext.getDevice();
+        for (auto semaphore : m_imageAvailableSemaphores) {
+            vkDestroySemaphore(device, semaphore, nullptr);
+        }
+        for (auto semaphore : m_renderFinishedSemaphores) {
+            vkDestroySemaphore(device, semaphore, nullptr);
+        }
+        for (auto fence : m_inFlightFences) {
+            vkDestroyFence(device, fence, nullptr);
+        }
+        for (auto framebuffer : m_frameBuffers) {
+            vkDestroyFramebuffer(device, framebuffer, nullptr);
+        }
+        vkDestroyCommandPool(device, m_commandPool, nullptr);
+        vkDestroyBuffer(device, m_vertexBuffer, nullptr);
+        vkFreeMemory(device, m_vertexBufferMemory, nullptr);
+        vkDestroyPipeline(device, m_pipeline, nullptr);
+        vkDestroyPipelineLayout(device, m_pipelineLayout, nullptr);
+        vkDestroyShaderModule(device, m_vertexShaderModule, nullptr);
+        vkDestroyShaderModule(device, m_fragmentShaderModule, nullptr);
+        vkDestroyRenderPass(device, m_renderPass, nullptr);
+    }
+
+    void Renderer::createRenderPass() {
+        VkAttachmentDescription colorAttachment{};
+        colorAttachment.format = m_swapchainContext.getFormat();
+        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        VkAttachmentReference colorAttachmentRef{};
+        colorAttachmentRef.attachment = 0;
+        colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription subpass{};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &colorAttachmentRef;
+        subpass.inputAttachmentCount = 0; // Fix
+        subpass.pInputAttachments = nullptr;
+
+        VkSubpassDependency dependency{};
+        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependency.dstSubpass = 0;
+        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.srcAccessMask = 0;
+        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        VkRenderPassCreateInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = 1;
+        renderPassInfo.pAttachments = &colorAttachment;
+        renderPassInfo.subpassCount = 1;
+        renderPassInfo.pSubpasses = &subpass;
+        renderPassInfo.dependencyCount = 1;
+        renderPassInfo.pDependencies = &dependency;
+
+        vkCreateRenderPass(m_deviceContext.getDevice(), &renderPassInfo, nullptr, &m_renderPass);
+    }
+
+    void Renderer::createRenderPass2() {
         // Create attachments
         // Create Color Attachment
         VkAttachmentDescription2 colorAttachment{};
@@ -64,25 +160,25 @@ namespace AetherEngine::Rendering {
         graphicsSubpass.preserveAttachmentCount = 0; // TODO
         graphicsSubpass.pPreserveAttachments = nullptr; // TODO
 
-
         // Create RenderPass
         VkRenderPassCreateInfo2 renderPassCreateInfo{};
-        renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO_2;
         renderPassCreateInfo.pNext = nullptr;
-        renderPassCreateInfo.flags = 0x0;
+        renderPassCreateInfo.flags = VK_RENDER_PASS_CREATE_TRANSFORM_BIT_QCOM;
         renderPassCreateInfo.attachmentCount = 1; // TODO: change to auto
         renderPassCreateInfo.pAttachments = &colorAttachment; // TODO: change
         renderPassCreateInfo.subpassCount = 1; // TODO: change to auto
         renderPassCreateInfo.pSubpasses = &graphicsSubpass; // TODO: change
-        renderPassCreateInfo.dependencyCount = 0; // TODO
-        renderPassCreateInfo.pDependencies = nullptr; // TODO
-
-        VkRenderPass m_renderPass{}; // TODO: move to fileds
+        // renderPassCreateInfo.dependencyCount = 0; // TODO
+        // renderPassCreateInfo.pDependencies = nullptr; // TODO
         vkCreateRenderPass2(m_deviceContext.getDevice(), &renderPassCreateInfo, nullptr, &m_renderPass);
+    }
 
+    void Renderer::createShaderModules() {
         // Create ShaderModules
         // Create Vertex ShaderModule
-        const std::vector<char> vertexCode = readShaderFile("../compiled_shaders/triangle_vert.spv"); // TODO: normal directory finding
+        // TODO: change
+        const std::vector<char> vertexCode = readShaderFile("../../../src/core/rendering/compiled_shaders/triangle_vert.spv"); // TODO: normal directory finding
 
         VkShaderModuleCreateInfo vertexShaderModuleCreateInfo{};
         vertexShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -91,10 +187,11 @@ namespace AetherEngine::Rendering {
         vertexShaderModuleCreateInfo.codeSize = vertexCode.size();
         vertexShaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(vertexCode.data()); // ???
 
-        vkCreateShaderModule(deviceContext.getDevice(), &vertexShaderModuleCreateInfo, nullptr, &m_vertexShaderModule);
+        vkCreateShaderModule(m_deviceContext.getDevice(), &vertexShaderModuleCreateInfo, nullptr, &m_vertexShaderModule);
 
-        // Create Fragment ShaderModule
-        const std::vector<char> fragmentCode = readShaderFile("../compiled_shaders/triangle_frag.spv"); // TODO: normal directory finding
+        // Create Fragment ShaderModule 
+        // TODO: change
+        const std::vector<char> fragmentCode = readShaderFile("../../../src/core/rendering/compiled_shaders/triangle_frag.spv"); // TODO: normal directory finding
 
         VkShaderModuleCreateInfo fragmentShaderModuleCreateInfo{};
         fragmentShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -103,8 +200,11 @@ namespace AetherEngine::Rendering {
         fragmentShaderModuleCreateInfo.codeSize = fragmentCode.size();
         fragmentShaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(fragmentCode.data()); // ???
 
-        vkCreateShaderModule(deviceContext.getDevice(), &fragmentShaderModuleCreateInfo, nullptr, &m_fragmentShaderModule);
+        vkCreateShaderModule(m_deviceContext.getDevice(), &fragmentShaderModuleCreateInfo, nullptr, &m_fragmentShaderModule);
 
+    }
+
+    void Renderer::createPipeline() {
         // Create ShaderStages
         // Create Vertex ShaderStage
         VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
@@ -124,33 +224,19 @@ namespace AetherEngine::Rendering {
 
         // Create Rendering States
         // Create VertexInput
-        VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInputInfo.pNext = nullptr;
-        vertexInputInfo.vertexBindingDescriptionCount = 0; // TODO
-        vertexInputInfo.pVertexBindingDescriptions = nullptr; // TODO
-        vertexInputInfo.vertexAttributeDescriptionCount = 0;
-        vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+        VkPipelineVertexInputStateCreateInfo vertexInput{};
+        vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInput.pNext = nullptr;
+        vertexInput.vertexBindingDescriptionCount = 0; // TODO
+        vertexInput.pVertexBindingDescriptions = nullptr; // TODO
+        vertexInput.vertexAttributeDescriptionCount = 0;
+        vertexInput.pVertexAttributeDescriptions = nullptr;
 
         // Create InputAssembly
         VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
         inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
         inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-        // Create Viewport
-        // VkViewport viewport{};
-        // viewport.x = 0.0f;
-        // viewport.y = 0.0f;
-        // viewport.width = (float)m_swapchainContext.getExtent().width; // TODO: normal cast
-        // viewport.height = (float)m_swapchainContext.getExtent().height; // TODO: normal cast
-        // viewport.minDepth = 0.0f;
-        // viewport.maxDepth = 1.0f;
-
-        // // Create Scissors
-        // VkRect2D scissor{};
-        // scissor.offset = {0, 0};
-        // scissor.extent = m_swapchainContext.getExtent();
 
         // Create DynamicStates
         std::vector<VkDynamicState> dynamicStates = {
@@ -170,14 +256,266 @@ namespace AetherEngine::Rendering {
         viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
         viewportState.viewportCount = 1;
         viewportState.scissorCount = 1;
+
+        // Create Rasterizer
+        VkPipelineRasterizationStateCreateInfo rasterizerState{};
+        rasterizerState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterizerState.pNext = nullptr; // TODO
+        // rasterizerState.flags
+        rasterizerState.depthClampEnable = VK_FALSE;
+        rasterizerState.rasterizerDiscardEnable = VK_FALSE;
+        rasterizerState.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterizerState.lineWidth = 1.0f;
+        rasterizerState.cullMode = VK_CULL_MODE_BACK_BIT;
+        rasterizerState.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        rasterizerState.depthBiasEnable = VK_FALSE;
+        // rasterizerState.depthBiasConstantFactor = 0.0f; // TODO
+        // rasterizerState.depthBiasClamp = 0.0f; // TODO
+        // rasterizerState.depthBiasSlopeFactor = 0.0f; // TODO
+
+        // Create Multisampling
+        VkPipelineMultisampleStateCreateInfo multisamplingState{};
+        multisamplingState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        multisamplingState.sampleShadingEnable = VK_FALSE;
+        multisamplingState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+        // multisamplingState.minSampleShading = 1.0f; // TODO
+        // multisamplingState.pSampleMask = nullptr; // TODO
+        // multisamplingState.alphaToCoverageEnable = VK_FALSE; // TODO
+        // multisamplingState.alphaToOneEnable = VK_FALSE; // TODO
+
+        // Create Color Blending
+        VkPipelineColorBlendAttachmentState colorBlendAttachmentState{};
+        colorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachmentState.blendEnable = VK_FALSE;
+        // colorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // TODO
+        // colorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // TODO
+        // colorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD; // TODO
+        // colorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // TODO
+        // colorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // TODO
+        // colorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD; // TODO
+
+        VkPipelineColorBlendStateCreateInfo colorBlendingState{};
+        colorBlendingState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        colorBlendingState.logicOpEnable = VK_FALSE;
+        colorBlendingState.logicOp = VK_LOGIC_OP_COPY;
+        colorBlendingState.attachmentCount = 1;
+        colorBlendingState.pAttachments = &colorBlendAttachmentState;
+        colorBlendingState.blendConstants[0] = 0.0f; // TODO
+        colorBlendingState.blendConstants[1] = 0.0f; // TODO
+        colorBlendingState.blendConstants[2] = 0.0f; // TODO
+        colorBlendingState.blendConstants[3] = 0.0f; // TODO
+
+        // Create Pipeline Layout
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = 0; // TODO
+        pipelineLayoutInfo.pSetLayouts = nullptr; // TODO
+        pipelineLayoutInfo.pushConstantRangeCount = 0; // TODO
+        pipelineLayoutInfo.pPushConstantRanges = nullptr; // TODO
+
+        if (vkCreatePipelineLayout(m_deviceContext.getDevice(), &pipelineLayoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create pipeline layout!");
+        }
+
+        // Create Graphics Pipline
+        VkGraphicsPipelineCreateInfo graphicsPiplineInfo{};
+        graphicsPiplineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        graphicsPiplineInfo.stageCount = 2; // TODO: dynamic
+        graphicsPiplineInfo.pStages = shaderStages;
+
+        graphicsPiplineInfo.pVertexInputState = &vertexInput;
+        graphicsPiplineInfo.pInputAssemblyState = &inputAssembly;
+        // graphicsPiplineInfo.flags = nullptr; // TODO
+        graphicsPiplineInfo.pTessellationState = nullptr; // TODO
+        graphicsPiplineInfo.pViewportState = &viewportState;
+        graphicsPiplineInfo.pRasterizationState = &rasterizerState;
+        graphicsPiplineInfo.pMultisampleState = &multisamplingState;
+        graphicsPiplineInfo.pDepthStencilState = nullptr; // TODO
+        graphicsPiplineInfo.pColorBlendState = &colorBlendingState;
+        graphicsPiplineInfo.pDynamicState = &dynamicState;
+        graphicsPiplineInfo.layout = m_pipelineLayout;
+        graphicsPiplineInfo.renderPass = m_renderPass;
+        graphicsPiplineInfo.subpass = 0; // TODO 
+        graphicsPiplineInfo.basePipelineHandle = VK_NULL_HANDLE; // TODO
+        graphicsPiplineInfo.basePipelineIndex = 0; // TODO
+
+        if (vkCreateGraphicsPipelines(m_deviceContext.getDevice(), VK_NULL_HANDLE, 1, &graphicsPiplineInfo, nullptr, &m_pipeline) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create graphics pipeline!");
+        }
     }
 
-    Renderer::~Renderer() {
-        if (m_fragmentShaderModule) {
-            vkDestroyShaderModule(m_deviceContext.getDevice(), m_fragmentShaderModule, nullptr);
+    void Renderer::createFramebuffers() {
+        std::vector<VkImageView> imageViews = m_swapchainContext.getImageViews();
+        m_frameBuffers.resize(imageViews.size());
+
+        for (uint32_t i = 0; i < imageViews.size(); ++i)
+        {
+            VkImageView attachments[] = {imageViews[i]};
+
+            // Create Framebuffer
+            VkFramebufferCreateInfo framebufferInfo{};
+            framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            framebufferInfo.pNext = nullptr;
+            framebufferInfo.flags = 0; // TODO
+            framebufferInfo.renderPass = m_renderPass;
+            framebufferInfo.attachmentCount = 1;
+            framebufferInfo.pAttachments = attachments;
+            framebufferInfo.height = m_swapchainContext.getExtent().height;
+            framebufferInfo.width = m_swapchainContext.getExtent().width;
+            framebufferInfo.layers = 1;
+
+            if (vkCreateFramebuffer(m_deviceContext.getDevice(), &framebufferInfo, nullptr, &m_frameBuffers[i]) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to create framebuffer!");
+            }
         }
-        if (m_vertexShaderModule) {
-            vkDestroyShaderModule(m_deviceContext.getDevice(), m_vertexShaderModule, nullptr);
+    }
+
+    void Renderer::createCommandPool() {
+        // Create Command Pool
+        VkCommandPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        poolInfo.queueFamilyIndex = m_deviceContext.getGraphicsFamily();
+
+        if (vkCreateCommandPool(m_deviceContext.getDevice(), &poolInfo, nullptr, &m_commandPool) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create command pool!");
         }
+    }
+
+    void Renderer::createCommandBuffers() {
+        // Allocate Command Buffer
+        m_commandBuffers.resize(1);
+
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = m_commandPool;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = 1;
+
+        if (vkAllocateCommandBuffers(m_deviceContext.getDevice(), &allocInfo, &m_commandBuffers[0]) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate command buffers!");
+        }
+    }
+
+    void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to begin recording command buffer!");
+        }
+
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = m_renderPass;
+        renderPassInfo.framebuffer = m_frameBuffers[imageIndex];
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = m_swapchainContext.getExtent();
+
+        VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+        renderPassInfo.clearValueCount = 1;
+        renderPassInfo.pClearValues = &clearColor;
+
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(m_swapchainContext.getExtent().width);
+        viewport.height = static_cast<float>(m_swapchainContext.getExtent().height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent = m_swapchainContext.getExtent();
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+        vkCmdDraw(commandBuffer, 3, 1, 0, 0); // Draw triangle (3 vertices, no buffer)
+
+        vkCmdEndRenderPass(commandBuffer);
+
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to record command buffer!");
+        }
+    }
+
+    void Renderer::createSyncObjects() {
+        m_imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        m_renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        m_inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
+        VkSemaphoreCreateInfo semaphoreInfo{};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+        VkFenceCreateInfo fenceInfo{};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            if (vkCreateSemaphore(m_deviceContext.getDevice(), &semaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]) != VK_SUCCESS ||
+                vkCreateSemaphore(m_deviceContext.getDevice(), &semaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]) != VK_SUCCESS ||
+                vkCreateFence(m_deviceContext.getDevice(), &fenceInfo, nullptr, &m_inFlightFences[i]) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to create synchronization objects!");
+            }
+        }
+    }
+    
+    void Renderer::drawFrame() {
+        static size_t currentFrame = 0;
+
+        vkWaitForFences(m_deviceContext.getDevice(), 1, &m_inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+        vkResetFences(m_deviceContext.getDevice(), 1, &m_inFlightFences[currentFrame]);
+
+        uint32_t imageIndex;
+        VkResult result = vkAcquireNextImageKHR(m_deviceContext.getDevice(), m_swapchainContext.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+            // Handle swapchain recreation (window resize, etc.)
+            return; // Skip frame for now
+        } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+            throw std::runtime_error("Failed to acquire swapchain image!");
+        }
+
+        vkResetCommandBuffer(m_commandBuffers[imageIndex], 0);
+        recordCommandBuffer(m_commandBuffers[imageIndex], imageIndex);
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+        VkSemaphore waitSemaphores[] = {m_imageAvailableSemaphores[currentFrame]};
+        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = waitSemaphores;
+        submitInfo.pWaitDstStageMask = waitStages;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &m_commandBuffers[imageIndex];
+
+        VkSemaphore signalSemaphores[] = {m_renderFinishedSemaphores[currentFrame]};
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = signalSemaphores;
+
+        if (vkQueueSubmit(m_deviceContext.getGraphicsQueue(), 1, &submitInfo, m_inFlightFences[currentFrame]) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to submit draw command buffer!");
+        }
+
+        VkPresentInfoKHR presentInfo{};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = signalSemaphores;
+        VkSwapchainKHR swapChains[] = {m_swapchainContext.getSwapchain()};
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = swapChains;
+        presentInfo.pImageIndices = &imageIndex;
+
+        result = vkQueuePresentKHR(m_deviceContext.getPresentQueue(), &presentInfo);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+            // Handle swapchain recreation
+        } else if (result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to present swapchain image!");
+        }
+
+        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 }

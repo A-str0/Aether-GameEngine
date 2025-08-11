@@ -10,6 +10,7 @@ set(SOURCE_FILES
     "src/core/rendering/vulkan/vulkan_context.cpp"
     "src/core/rendering/vulkan/vulkan_device_context.cpp"
     "src/core/rendering/vulkan/vulkan_swapchain_context.cpp"
+    "src/core/rendering/vulkan/renderer.cpp"
     "src/main.cpp"
 )
 

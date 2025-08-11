@@ -11,6 +11,14 @@ namespace AetherEngine::Rendering {
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_0;
 
+        // Check for Debug Utils Extension
+        for (const auto& ext : extensions) {
+            if (strcmp(ext, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0) {
+                extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+                break;
+            }
+        }
+
         VkInstanceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         createInfo.pApplicationInfo = &appInfo;
@@ -34,29 +42,28 @@ namespace AetherEngine::Rendering {
             if (!layerFound) {
                 throw std::runtime_error("Validation Layers not supported");
             }
-            createInfo.enabledLayerCount = 1;
+            createInfo.enabledLayerCount = 1; // TODO: move to settings
             createInfo.ppEnabledLayerNames = &validationLayer;
         } else {
             createInfo.enabledLayerCount = 0;
         }
 
-        // TODO: make debug messenger
-        // VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-        // if (enableValidationLayers) {
-        //     debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        //     debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-        //                                      VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-        //                                      VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        //     debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-        //                                   VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-        //                                   VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        //     // debugCreateInfo.pfnUserCallback = debugCallback;
-        //     createInfo.pNext = &debugCreateInfo;
-        // }
-
         if (vkCreateInstance(&createInfo, nullptr, &m_instance) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create Vulkan Instance");
         }
+
+        // PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessenger = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(m_instance, "vkCreateDebugUtilsMessengerEXT");
+        // if (!vkCreateDebugUtilsMessenger) {
+        //     throw std::runtime_error("Debug utils not loaded!");
+        // }
+        // VkDebugUtilsMessengerCreateInfoEXT messengerInfo{};
+        // messengerInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        // messengerInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        // messengerInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        // messengerInfo.pfnUserCallback = debugCallback;
+        // messengerInfo.pUserData = nullptr; // Твой data
+        // VkDebugUtilsMessengerEXT messenger;
+        // vkCreateDebugUtilsMessenger(m_instance, &messengerInfo, nullptr, &messenger);
     }
 
     VulkanContext::~VulkanContext() {
@@ -64,16 +71,4 @@ namespace AetherEngine::Rendering {
             vkDestroyInstance(m_instance, nullptr);
         }
     }
-
-    // std::vector<const char*> VulkanContext::getRequiredExtensions(SDL_Window* window, bool enableValidationLayers) {
-    //     uint32_t extensionCount = 0;
-    //     SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, nullptr);
-    //     std::vector<const char*> extensions(extensionCount);
-    //     SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, extensions.data());
-
-    //     if (enableValidationLayers) {
-    //         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    //     }
-    //     return extensions;
-    // }
 }
