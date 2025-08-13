@@ -23,6 +23,7 @@ namespace AetherEngine::Rendering {
         VkFormat getFormat() const { return m_format; }
         VkExtent2D getExtent() const { return m_extent; }
 
+        void recreateSwapchain();
     private:
         VkSurfaceFormatKHR selectSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);
         VkPresentModeKHR selectPresentMode(const std::vector<VkPresentModeKHR>& presentModes);
