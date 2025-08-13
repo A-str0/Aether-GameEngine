@@ -1,5 +1,3 @@
-Here’s the English translation of your README while keeping the tone clean but not over-the-top:
-
 # Aether-GameEngine
 
 A lightweight and modular C++ game engine utilizing low-level rendering via Vulkan.
