@@ -384,15 +384,16 @@ namespace AetherEngine::Rendering {
 
     void Renderer::createCommandBuffers() {
         // Allocate Command Buffer
-        m_commandBuffers.resize(1);
+        auto imageCount = m_swapchainContext.getImageViews().size();
+        m_commandBuffers.resize(imageCount);
 
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.commandPool = m_commandPool;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = 1;
+        allocInfo.commandBufferCount = static_cast<uint32_t>(m_commandBuffers.size());
 
-        if (vkAllocateCommandBuffers(m_deviceContext.getDevice(), &allocInfo, &m_commandBuffers[0]) != VK_SUCCESS) {
+        if (vkAllocateCommandBuffers(m_deviceContext.getDevice(), &allocInfo, m_commandBuffers.data()) != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate command buffers!");
         }
     }
@@ -478,7 +479,7 @@ namespace AetherEngine::Rendering {
             throw std::runtime_error("Failed to acquire swapchain image!");
         }
 
-        vkResetCommandBuffer(m_commandBuffers[imageIndex], 0);
+        vkResetCommandBuffer(m_commandBuffers[imageIndex], 0); // ERROR!!!!
         recordCommandBuffer(m_commandBuffers[imageIndex], imageIndex);
 
         VkSubmitInfo submitInfo{};
