@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <iostream>
 
+#include "../objects/vertex.h"
+
 namespace AetherEngine::Rendering {
     const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -46,8 +48,9 @@ namespace AetherEngine::Rendering {
 
         createRenderPass();
         createShaderModules();
-        createPipeline();
+        createGraphicsPipeline();
         createFramebuffers();
+        createBuffers();
         createCommandPool();
         createCommandBuffers();
         createSyncObjects();
@@ -67,9 +70,11 @@ namespace AetherEngine::Rendering {
         for (auto framebuffer : m_frameBuffers) {
             vkDestroyFramebuffer(device, framebuffer, nullptr);
         }
-        vkDestroyCommandPool(device, m_commandPool, nullptr);
+
         vkDestroyBuffer(device, m_vertexBuffer, nullptr);
         vkFreeMemory(device, m_vertexBufferMemory, nullptr);
+
+        vkDestroyCommandPool(device, m_commandPool, nullptr);
         vkDestroyPipeline(device, m_pipeline, nullptr);
         vkDestroyPipelineLayout(device, m_pipelineLayout, nullptr);
         vkDestroyShaderModule(device, m_vertexShaderModule, nullptr);
@@ -204,7 +209,7 @@ namespace AetherEngine::Rendering {
 
     }
 
-    void Renderer::createPipeline() {
+    void Renderer::createGraphicsPipeline() {
         // Create ShaderStages
         // Create Vertex ShaderStage
         VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
@@ -224,13 +229,16 @@ namespace AetherEngine::Rendering {
 
         // Create Rendering States
         // Create VertexInput
+        auto bindingDescription = Objects::Vertex::getBindingDescription();
+        auto attributeDescriptions = Objects::Vertex::getAttributeDescriptions();
+
         VkPipelineVertexInputStateCreateInfo vertexInput{};
         vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
         vertexInput.pNext = nullptr;
-        vertexInput.vertexBindingDescriptionCount = 0; // TODO
-        vertexInput.pVertexBindingDescriptions = nullptr; // TODO
-        vertexInput.vertexAttributeDescriptionCount = 0;
-        vertexInput.pVertexAttributeDescriptions = nullptr;
+        vertexInput.vertexBindingDescriptionCount = 1;
+        vertexInput.pVertexBindingDescriptions = &bindingDescription; // TODO
+        vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+        vertexInput.pVertexAttributeDescriptions = attributeDescriptions.data();
 
         // Create InputAssembly
         VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
@@ -370,6 +378,42 @@ namespace AetherEngine::Rendering {
         }
     }
 
+    void Renderer::createBuffers() {
+        // Create VertexBuffer
+        VkBufferCreateInfo vertexBufferInfo{};
+        vertexBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        vertexBufferInfo.flags = 0; // TODO
+        vertexBufferInfo.pNext = nullptr; // TODO
+        vertexBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        vertexBufferInfo.size =  sizeof(m_vertices[0]) * m_vertices.size();
+        vertexBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        if (vkCreateBuffer(m_deviceContext.getDevice(), &vertexBufferInfo, nullptr, &m_vertexBuffer) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create vertex buffer!");
+        }   
+
+        VkMemoryRequirements memoryRequirements{};
+        vkGetBufferMemoryRequirements(m_deviceContext.getDevice(), m_vertexBuffer, &memoryRequirements);
+
+        VkMemoryAllocateInfo allocateInfo{};
+        allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocateInfo.pNext = nullptr;
+        allocateInfo.allocationSize = memoryRequirements.size;
+        allocateInfo.memoryTypeIndex = m_deviceContext.getMemoryType(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    
+        if (vkAllocateMemory(m_deviceContext.getDevice(), &allocateInfo, nullptr, &m_vertexBufferMemory) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate vertex buffer memory!");
+        }
+
+        vkBindBufferMemory(m_deviceContext.getDevice(), m_vertexBuffer, m_vertexBufferMemory, 0);
+
+        // TODO: refactor
+        void* data; // TODO
+        vkMapMemory(m_deviceContext.getDevice(), m_vertexBufferMemory, 0, vertexBufferInfo.size, 0, &data);
+            memcpy(data, m_vertices.data(), (size_t) vertexBufferInfo.size);
+        vkUnmapMemory(m_deviceContext.getDevice(), m_vertexBufferMemory);
+    }
+
     void Renderer::createCommandPool() {
         // Create Command Pool
         VkCommandPoolCreateInfo poolInfo{};
@@ -434,7 +478,12 @@ namespace AetherEngine::Rendering {
         scissor.extent = m_swapchainContext.getExtent();
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        vkCmdDraw(commandBuffer, 3, 1, 0, 0); // Draw triangle (3 vertices, no buffer)
+        // Bind VertexBuffer
+        VkBuffer vertexBuffers[] = {m_vertexBuffer};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+        vkCmdDraw(commandBuffer,  static_cast<uint32_t>(m_vertices.size()), 1, 0, 0);
 
         vkCmdEndRenderPass(commandBuffer);
 

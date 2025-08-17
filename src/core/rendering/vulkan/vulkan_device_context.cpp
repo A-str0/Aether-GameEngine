@@ -88,4 +88,18 @@ namespace AetherEngine::Rendering {
 
         return indices;
     }
+
+    uint32_t VulkanDeviceContext::getMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+        VkPhysicalDeviceMemoryProperties2 memoryProperties{};
+        vkGetPhysicalDeviceMemoryProperties2(m_physicalDevice, &memoryProperties);
+
+        // TODO: make better way for defining
+        for (uint32_t i = 0; i < memoryProperties.memoryProperties.memoryTypeCount; i++) {
+            if ((typeFilter & (1 << i)) && (memoryProperties.memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+                return i;
+            }
+        }
+
+        throw std::runtime_error("Failed to find suitable memory type!");
+    }
 }

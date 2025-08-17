@@ -1,5 +1,6 @@
 #include "vulkan_device_context.h"
 #include "vulkan_swapchain_context.h"
+#include "../objects/vertex.h"
 #include <vulkan/vulkan.hpp>
 #include <vector>
 
@@ -24,8 +25,9 @@ namespace AetherEngine::Rendering {
         void createRenderPass();
         void createRenderPass2();
         void createShaderModules();
-        void createPipeline();
+        void createGraphicsPipeline();
         void createFramebuffers();
+        void createBuffers();
         void createCommandPool();
         void createCommandBuffers();
         void createSyncObjects();
@@ -38,11 +40,12 @@ namespace AetherEngine::Rendering {
         VkRenderPass m_renderPass = VK_NULL_HANDLE;
         VkPipeline m_pipeline = VK_NULL_HANDLE;
 
+        VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
+
         VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
         VkShaderModule m_vertexShaderModule = VK_NULL_HANDLE;
         VkShaderModule m_fragmentShaderModule = VK_NULL_HANDLE;
-        VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
 
         VkCommandPool m_commandPool = VK_NULL_HANDLE;
 
@@ -52,6 +55,16 @@ namespace AetherEngine::Rendering {
         std::vector<VkSemaphore> m_imageAvailableSemaphores;
         std::vector<VkSemaphore> m_renderFinishedSemaphores;
         std::vector<VkFence> m_inFlightFences;
+
+        // TODO: refactor
+        const std::vector<Objects::Vertex> m_vertices = {
+            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+            {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+            {{-0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+        };
     };
 }
 

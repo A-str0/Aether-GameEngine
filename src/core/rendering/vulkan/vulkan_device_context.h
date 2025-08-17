@@ -25,6 +25,8 @@ namespace AetherEngine::Rendering {
         uint32_t getGraphicsFamily() const { return m_indices.graphicsFamily; }
         uint32_t getPresentFamily() const { return m_indices.presentFamily; }
         QueueFamilyIndices getQueueFamilyIndicies() const { return m_indices; }
+
+        u_int32_t getMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     private:
         QueueFamilyIndices findQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface);
 
