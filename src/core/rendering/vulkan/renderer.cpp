@@ -472,14 +472,13 @@ namespace AetherEngine::Rendering {
 
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(m_deviceContext.getDevice(), m_swapchainContext.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
-        if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-            // Handle swapchain recreation (window resize, etc.)
-            return; // Skip frame for now
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+            m_swapchainContext.recreateSwapchain();
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             throw std::runtime_error("Failed to acquire swapchain image!");
         }
 
-        vkResetCommandBuffer(m_commandBuffers[imageIndex], 0); // ERROR!!!!
+        vkResetCommandBuffer(m_commandBuffers[imageIndex], 0);
         recordCommandBuffer(m_commandBuffers[imageIndex], imageIndex);
 
         VkSubmitInfo submitInfo{};

@@ -32,7 +32,7 @@ int main() {
     VkPhysicalDevice physicalDevice = physicalDevices[0]; // TODO: cooler selection
     
     AetherEngine::Rendering::VulkanDeviceContext deviceContext {physicalDevice, windowContext.getSurface()};
-    AetherEngine::Rendering::VulkanSwapchainContext swapchainContext {deviceContext, physicalDevice, windowContext.getSurface(), windowContext.getWindow()};
+    AetherEngine::Rendering::VulkanSwapchainContext swapchainContext {deviceContext, windowContext};
     AetherEngine::Rendering::Renderer renderer {deviceContext, swapchainContext, windowContext.getSurface()};
 
     bool running = true;

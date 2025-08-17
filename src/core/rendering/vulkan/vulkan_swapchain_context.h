@@ -2,6 +2,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 #include "vulkan_device_context.h"
+#include "../../window_context.h"
 
 #ifndef AETHERENGINE_RENDERING_SWAPCHAINCONTEXT_H
 #define AETHERENGINE_RENDERING_SWAPCHAINCONTEXT_H
@@ -9,7 +10,7 @@
 namespace AetherEngine::Rendering {
     class VulkanSwapchainContext {
     public:
-        VulkanSwapchainContext(AetherEngine::Rendering::VulkanDeviceContext& deviceContext, VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, SDL_Window* window);
+        VulkanSwapchainContext(VulkanDeviceContext& deviceContext, WindowContext& windowContext);
         ~VulkanSwapchainContext();
 
         VulkanSwapchainContext(const VulkanSwapchainContext&) = delete;
@@ -29,12 +30,17 @@ namespace AetherEngine::Rendering {
         VkPresentModeKHR selectPresentMode(const std::vector<VkPresentModeKHR>& presentModes);
         VkExtent2D selectExtent(const VkSurfaceCapabilitiesKHR& capabilities, SDL_Window* window);
 
-        VkDevice m_device;
+        VulkanDeviceContext* m_deviceContext;
+        WindowContext* m_windowContext;
         VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
         std::vector<VkImage> m_images; // TODO: change data structures
         std::vector<VkImageView> m_imageViews;
         VkFormat m_format;
         VkExtent2D m_extent;
+
+        void createSwapchain();
+        void createImageViews();
+        void cleanup();
     };
 }
 
