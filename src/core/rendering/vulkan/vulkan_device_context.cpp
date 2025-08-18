@@ -73,6 +73,7 @@ namespace AetherEngine::Rendering {
         std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
         vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
 
+        // TODO: review this code
         for (uint32_t i = 0; i < queueFamilyCount; ++i) {
             // Graphics Family
             if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) 
@@ -80,12 +81,12 @@ namespace AetherEngine::Rendering {
                 indices.graphicsFamily = i;
             } 
             // TODO: Compute Family
-            else if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) 
+            if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) 
             {
-                continue;
+                
             } 
             // Transfer Family
-            else if (queueFamilies[i].queueFlags & VK_QUEUE_TRANSFER_BIT) 
+            if (queueFamilies[i].queueFlags & VK_QUEUE_TRANSFER_BIT) 
             {
                 indices.transferFamily = i;
             }
