@@ -56,6 +56,7 @@ namespace AetherEngine::Rendering {
         // Get queues
         vkGetDeviceQueue(m_device, m_indices.graphicsFamily, 0, &m_graphicsQueue);
         vkGetDeviceQueue(m_device, m_indices.presentFamily, 0, &m_presentQueue);
+        vkGetDeviceQueue(m_device, m_indices.transferFamily, 0, &m_transferQueue);
     }
 
     VulkanDeviceContext::~VulkanDeviceContext() {
@@ -73,14 +74,30 @@ namespace AetherEngine::Rendering {
         vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
 
         for (uint32_t i = 0; i < queueFamilyCount; ++i) {
-            if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+            // Graphics Family
+            if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) 
+            {
                 indices.graphicsFamily = i;
+            } 
+            // TODO: Compute Family
+            else if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) 
+            {
+                continue;
+            } 
+            // Transfer Family
+            else if (queueFamilies[i].queueFlags & VK_QUEUE_TRANSFER_BIT) 
+            {
+                indices.transferFamily = i;
             }
+
+            // Present Family
             VkBool32 presentSupport = VK_FALSE;
             vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &presentSupport);
             if (presentSupport) {
                 indices.presentFamily = i;
             }
+
+            // Quit the cycle
             if (indices.graphicsFamily != UINT32_MAX && indices.presentFamily != UINT32_MAX) {
                 break;
             }

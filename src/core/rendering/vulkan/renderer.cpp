@@ -75,8 +75,8 @@ namespace AetherEngine::Rendering {
         vkFreeMemory(device, m_vertexBufferMemory, nullptr);
 
         vkDestroyCommandPool(device, m_commandPool, nullptr);
-        vkDestroyPipeline(device, m_pipeline, nullptr);
-        vkDestroyPipelineLayout(device, m_pipelineLayout, nullptr);
+        vkDestroyPipeline(device, m_graphicsPipeline, nullptr);
+        vkDestroyPipelineLayout(device, m_graphicsPipelineLayout, nullptr);
         vkDestroyShaderModule(device, m_vertexShaderModule, nullptr);
         vkDestroyShaderModule(device, m_fragmentShaderModule, nullptr);
         vkDestroyRenderPass(device, m_renderPass, nullptr);
@@ -321,7 +321,7 @@ namespace AetherEngine::Rendering {
         pipelineLayoutInfo.pushConstantRangeCount = 0; // TODO
         pipelineLayoutInfo.pPushConstantRanges = nullptr; // TODO
 
-        if (vkCreatePipelineLayout(m_deviceContext.getDevice(), &pipelineLayoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS) {
+        if (vkCreatePipelineLayout(m_deviceContext.getDevice(), &pipelineLayoutInfo, nullptr, &m_graphicsPipelineLayout) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create pipeline layout!");
         }
 
@@ -341,13 +341,13 @@ namespace AetherEngine::Rendering {
         graphicsPiplineInfo.pDepthStencilState = nullptr; // TODO
         graphicsPiplineInfo.pColorBlendState = &colorBlendingState;
         graphicsPiplineInfo.pDynamicState = &dynamicState;
-        graphicsPiplineInfo.layout = m_pipelineLayout;
+        graphicsPiplineInfo.layout = m_graphicsPipelineLayout;
         graphicsPiplineInfo.renderPass = m_renderPass;
         graphicsPiplineInfo.subpass = 0; // TODO 
         graphicsPiplineInfo.basePipelineHandle = VK_NULL_HANDLE; // TODO
         graphicsPiplineInfo.basePipelineIndex = 0; // TODO
 
-        if (vkCreateGraphicsPipelines(m_deviceContext.getDevice(), VK_NULL_HANDLE, 1, &graphicsPiplineInfo, nullptr, &m_pipeline) != VK_SUCCESS) {
+        if (vkCreateGraphicsPipelines(m_deviceContext.getDevice(), VK_NULL_HANDLE, 1, &graphicsPiplineInfo, nullptr, &m_graphicsPipeline) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create graphics pipeline!");
         }
     }
@@ -380,38 +380,60 @@ namespace AetherEngine::Rendering {
 
     void Renderer::createBuffers() {
         // Create VertexBuffer
-        VkBufferCreateInfo vertexBufferInfo{};
-        vertexBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        vertexBufferInfo.flags = 0; // TODO
-        vertexBufferInfo.pNext = nullptr; // TODO
-        vertexBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-        vertexBufferInfo.size =  sizeof(m_vertices[0]) * m_vertices.size();
-        vertexBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-        if (vkCreateBuffer(m_deviceContext.getDevice(), &vertexBufferInfo, nullptr, &m_vertexBuffer) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create vertex buffer!");
-        }   
-
-        VkMemoryRequirements memoryRequirements{};
-        vkGetBufferMemoryRequirements(m_deviceContext.getDevice(), m_vertexBuffer, &memoryRequirements);
-
-        VkMemoryAllocateInfo allocateInfo{};
-        allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocateInfo.pNext = nullptr;
-        allocateInfo.allocationSize = memoryRequirements.size;
-        allocateInfo.memoryTypeIndex = m_deviceContext.getMemoryType(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    
-        if (vkAllocateMemory(m_deviceContext.getDevice(), &allocateInfo, nullptr, &m_vertexBufferMemory) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to allocate vertex buffer memory!");
-        }
-
-        vkBindBufferMemory(m_deviceContext.getDevice(), m_vertexBuffer, m_vertexBufferMemory, 0);
+        VkDeviceSize vertexBufferSize = sizeof(m_vertices[0]) * m_vertices.size();
+        createBuffer(
+            vertexBufferSize, 
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            m_vertexBuffer,
+            m_vertexBufferMemory
+        );
 
         // TODO: refactor
         void* data; // TODO
-        vkMapMemory(m_deviceContext.getDevice(), m_vertexBufferMemory, 0, vertexBufferInfo.size, 0, &data);
-            memcpy(data, m_vertices.data(), (size_t) vertexBufferInfo.size);
+        vkMapMemory(m_deviceContext.getDevice(), m_vertexBufferMemory, 0, vertexBufferSize, 0, &data);
+            memcpy(data, m_vertices.data(), (size_t) vertexBufferSize);
         vkUnmapMemory(m_deviceContext.getDevice(), m_vertexBufferMemory);
+    }
+
+    void Renderer::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.flags = 0; // TODO
+        bufferInfo.pNext = nullptr; // TODO
+        bufferInfo.size = size;
+        bufferInfo.usage = usage;
+        bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT; // is it??
+
+        if (vkCreateBuffer(m_deviceContext.getDevice(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create buffer!");
+        }
+
+        VkMemoryRequirements memoryRequirements;
+        vkGetBufferMemoryRequirements(m_deviceContext.getDevice(), buffer, &memoryRequirements);
+
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memoryRequirements.size;
+        allocInfo.memoryTypeIndex = m_deviceContext.getMemoryType(memoryRequirements.memoryTypeBits, properties);
+
+        if (vkAllocateMemory(m_deviceContext.getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate buffer memory!");
+        }
+
+        vkBindBufferMemory(m_deviceContext.getDevice(), buffer, bufferMemory, 0);
+    }
+
+    void Renderer::createTransferCommandPool() {
+        // Create Transfer Command Pool
+        VkCommandPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        poolInfo.queueFamilyIndex = m_deviceContext.getTransferFamily();
+
+        if (vkCreateCommandPool(m_deviceContext.getDevice(), &poolInfo, nullptr, &m_transferCommandPool) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create transfer command pool!");
+        }
     }
 
     void Renderer::createCommandPool() {
@@ -462,7 +484,7 @@ namespace AetherEngine::Rendering {
         renderPassInfo.pClearValues = &clearColor;
 
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
 
         VkViewport viewport{};
         viewport.x = 0.0f;
