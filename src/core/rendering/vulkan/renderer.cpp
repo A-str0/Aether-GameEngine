@@ -12,9 +12,9 @@
 
 #include "../objects/vertex.h"
 
-namespace AetherEngine::Rendering {
-    const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+#define MAX_FRAMES_IN_FLIGHT 2
 
+namespace AetherEngine::Rendering {
     std::vector<char> readShaderFile(const std::string& filename) {
         std::filesystem::path path = std::filesystem::absolute(filename);
 
@@ -59,6 +59,8 @@ namespace AetherEngine::Rendering {
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
+        createDescriptorPool();
+        createDescriptorSets();
         createCommandPool();
         createCommandBuffers();
         createSyncObjects();
@@ -89,6 +91,7 @@ namespace AetherEngine::Rendering {
         vkFreeMemory(device, m_indexBufferMemory, nullptr);
 
         vkDestroyCommandPool(device, m_commandPool, nullptr);
+        vkDestroyDescriptorPool(device, m_descriptorPool, nullptr);
         vkDestroyDescriptorSetLayout(device, m_descriptorSetLayout, nullptr);
         vkDestroyPipeline(device, m_graphicsPipeline, nullptr);
         vkDestroyPipelineLayout(device, m_graphicsPipelineLayout, nullptr);
@@ -308,7 +311,7 @@ namespace AetherEngine::Rendering {
         rasterizerState.polygonMode = VK_POLYGON_MODE_FILL;
         rasterizerState.lineWidth = 1.0f;
         rasterizerState.cullMode = VK_CULL_MODE_BACK_BIT;
-        rasterizerState.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        rasterizerState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterizerState.depthBiasEnable = VK_FALSE;
         // rasterizerState.depthBiasConstantFactor = 0.0f; // TODO
         // rasterizerState.depthBiasClamp = 0.0f; // TODO
@@ -505,6 +508,56 @@ namespace AetherEngine::Rendering {
         }
     }
 
+    void Renderer::createDescriptorPool() {
+        VkDescriptorPoolSize poolSize{};
+        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSize.descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = 1;
+        poolInfo.pPoolSizes = &poolSize;
+        poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        if (vkCreateDescriptorPool(m_deviceContext.getDevice(), &poolInfo, nullptr, &m_descriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create descriptor pool!");
+        }
+    }
+
+    void Renderer::createDescriptorSets() {
+        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, m_descriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = m_descriptorPool;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        allocInfo.pSetLayouts = layouts.data();
+
+        m_descriptorSets.resize(layouts.size());
+        if (vkAllocateDescriptorSets(m_deviceContext.getDevice(), &allocInfo, m_descriptorSets.data()) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate descriptor sets!");
+        }
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            VkDescriptorBufferInfo bufferInfo{};
+            bufferInfo.buffer = m_uniformBuffers[i];
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(UniformBufferObject);
+
+            VkWriteDescriptorSet descriptorWrite{};
+            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet = m_descriptorSets[i];
+            descriptorWrite.dstBinding = 0;
+            descriptorWrite.dstArrayElement = 0;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pBufferInfo = &bufferInfo;
+            descriptorWrite.pImageInfo = nullptr; // TODO
+            descriptorWrite.pTexelBufferView = nullptr; // TODO
+
+            vkUpdateDescriptorSets(m_deviceContext.getDevice(), 1, &descriptorWrite, 0, nullptr);
+        }
+    }
+
     void Renderer::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -659,6 +712,11 @@ namespace AetherEngine::Rendering {
         // Bind IndexBuffer
         vkCmdBindIndexBuffer(commandBuffer, m_indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
+        // Bind Descriptors
+        // TODO: implement better way than `imageIndex % MAX_FRAMES_IN_FLIGHT`
+        // std::cout << "Binding descriptor set: " << m_descriptorSets[imageIndex % MAX_FRAMES_IN_FLIGHT] << " for image " << imageIndex % MAX_FRAMES_IN_FLIGHT << std::endl;
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 0, 1, &m_descriptorSets[imageIndex % MAX_FRAMES_IN_FLIGHT], 0, nullptr);
+
         // vkCmdDraw(commandBuffer,  static_cast<uint32_t>(m_vertices.size()), 1, 0, 0);
         vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
 
@@ -681,9 +739,9 @@ namespace AetherEngine::Rendering {
         ubo.proj = glm::perspective(glm::radians(45.0f), m_swapchainContext.getExtent().width / (float) m_swapchainContext.getExtent().height, 0.1f, 10.0f);
         ubo.proj[1][1] *= -1;
 
-        memcpy(m_uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
         // Using a UBO this way is not the most efficient way to pass frequently changing values to the shader. 
         // A more efficient way to pass a small buffer of data to shaders are push constants
+        memcpy(m_uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
     void Renderer::createSyncObjects() {
@@ -717,14 +775,20 @@ namespace AetherEngine::Rendering {
         VkResult result = vkAcquireNextImageKHR(m_deviceContext.getDevice(), m_swapchainContext.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
             m_swapchainContext.recreateSwapchain();
+
+            // TODO: refactor
+            vkDestroyDescriptorPool(m_deviceContext.getDevice(), m_descriptorPool, nullptr);
+            createDescriptorPool();
+            createDescriptorSets();
+            return; // TODO: change?
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             throw std::runtime_error("Failed to acquire swapchain image!");
         }
 
-        updateUniformBuffer(currentFrame);
-
         vkResetCommandBuffer(m_commandBuffers[imageIndex], 0);
         recordCommandBuffer(m_commandBuffers[imageIndex], imageIndex);
+
+        updateUniformBuffer(currentFrame);
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;

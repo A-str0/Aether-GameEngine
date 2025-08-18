@@ -31,6 +31,8 @@ namespace AetherEngine::Rendering {
         void createVertexBuffer();
         void createIndexBuffer();
         void createUniformBuffers();
+        void createDescriptorPool();
+        void createDescriptorSets();
         void createTransferCommandPool();
         void createCommandPool();
         void createCommandBuffers();
@@ -48,9 +50,12 @@ namespace AetherEngine::Rendering {
         VkShaderModule m_fragmentShaderModule = VK_NULL_HANDLE;
 
         VkRenderPass m_renderPass = VK_NULL_HANDLE;
-        VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
         VkPipelineLayout m_graphicsPipelineLayout = VK_NULL_HANDLE;
         VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
+
+        VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
+        VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
+        std::vector<VkDescriptorSet> m_descriptorSets;
 
         // TODO: for performance i should use on VkBuffer for Verticies and offset for this
         // It is even possible to reuse the same chunk of memory for multiple resources if 
