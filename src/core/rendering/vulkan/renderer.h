@@ -33,6 +33,7 @@ namespace AetherEngine::Rendering {
         void createCommandBuffers();
         void createSyncObjects();
 
+        void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
         void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
         void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 

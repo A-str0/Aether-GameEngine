@@ -50,6 +50,7 @@ namespace AetherEngine::Rendering {
         createShaderModules();
         createGraphicsPipeline();
         createFramebuffers();
+        createTransferCommandPool();
         createBuffers();
         createCommandPool();
         createCommandBuffers();
@@ -379,21 +380,40 @@ namespace AetherEngine::Rendering {
     }
 
     void Renderer::createBuffers() {
-        // Create VertexBuffer
         VkDeviceSize vertexBufferSize = sizeof(m_vertices[0]) * m_vertices.size();
+        
+        // Craete Staging Buffer
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
         createBuffer(
             vertexBufferSize, 
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            m_vertexBuffer,
-            m_vertexBufferMemory
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+            stagingBuffer, 
+            stagingBufferMemory
         );
 
         // TODO: refactor
         void* data; // TODO
-        vkMapMemory(m_deviceContext.getDevice(), m_vertexBufferMemory, 0, vertexBufferSize, 0, &data);
+        vkMapMemory(m_deviceContext.getDevice(), stagingBufferMemory, 0, vertexBufferSize, 0, &data);
             memcpy(data, m_vertices.data(), (size_t) vertexBufferSize);
-        vkUnmapMemory(m_deviceContext.getDevice(), m_vertexBufferMemory);
+        vkUnmapMemory(m_deviceContext.getDevice(), stagingBufferMemory);
+
+        // Create VertexBuffer
+        createBuffer(
+            vertexBufferSize, 
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            m_vertexBuffer,
+            m_vertexBufferMemory
+        );
+
+        // Copy Vertices
+        copyBuffer(stagingBuffer, m_vertexBuffer, vertexBufferSize);
+
+        // Cleanup
+        vkDestroyBuffer(m_deviceContext.getDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(m_deviceContext.getDevice(), stagingBufferMemory, nullptr);
     }
 
     void Renderer::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
@@ -428,7 +448,7 @@ namespace AetherEngine::Rendering {
         // Create Transfer Command Pool
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         poolInfo.queueFamilyIndex = m_deviceContext.getTransferFamily();
 
         if (vkCreateCommandPool(m_deviceContext.getDevice(), &poolInfo, nullptr, &m_transferCommandPool) != VK_SUCCESS) {
@@ -462,6 +482,48 @@ namespace AetherEngine::Rendering {
         if (vkAllocateCommandBuffers(m_deviceContext.getDevice(), &allocInfo, m_commandBuffers.data()) != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate command buffers!");
         }
+    }
+
+    void Renderer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.pNext = nullptr;
+        allocInfo.commandPool = m_transferCommandPool;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = 1;
+
+        // TODO: make cooler memory allocation (don't call vkAllocateCommandBuffers for every buffer)
+        VkCommandBuffer tempCommandBuffer;
+        // vkAllocateCommandBuffers(m_deviceContext.getDevice(), &allocInfo, &tempCommandBuffer);
+        if (vkAllocateCommandBuffers(m_deviceContext.getDevice(), &allocInfo, &tempCommandBuffer) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate temp command buffer!");
+        }
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        vkBeginCommandBuffer(tempCommandBuffer, &beginInfo);
+
+        VkBufferCopy copyRegion{};
+        copyRegion.srcOffset = 0; // TODO
+        copyRegion.dstOffset = 0; // TODO
+        copyRegion.size = size;
+        vkCmdCopyBuffer(tempCommandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+        vkEndCommandBuffer(tempCommandBuffer);
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &tempCommandBuffer;
+
+        // TODO: change Queue to submit
+        vkQueueSubmit(m_deviceContext.getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+        // TODO: fence usage
+        vkQueueWaitIdle(m_deviceContext.getGraphicsQueue());
+
+        vkFreeCommandBuffers(m_deviceContext.getDevice(), m_transferCommandPool, 1, &tempCommandBuffer);
     }
 
     void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
