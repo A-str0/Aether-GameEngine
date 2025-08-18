@@ -27,7 +27,8 @@ namespace AetherEngine::Rendering {
         void createShaderModules();
         void createGraphicsPipeline();
         void createFramebuffers();
-        void createBuffers();
+        void createVertexBuffer();
+        void createIndexBuffer();
         void createTransferCommandPool();
         void createCommandPool();
         void createCommandBuffers();
@@ -49,6 +50,8 @@ namespace AetherEngine::Rendering {
 
         VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
+        VkBuffer m_indexBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory m_indexBufferMemory = VK_NULL_HANDLE;
 
         VkCommandPool m_commandPool = VK_NULL_HANDLE;
         VkCommandPool m_transferCommandPool = VK_NULL_HANDLE;
@@ -65,9 +68,10 @@ namespace AetherEngine::Rendering {
             {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
             {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
             {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-            {{-0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+            {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
+        };
+        const std::vector<uint16_t> m_indices = {
+            0, 1, 2, 2, 3, 0
         };
     };
 }

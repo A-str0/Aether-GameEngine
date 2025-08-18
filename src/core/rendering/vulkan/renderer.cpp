@@ -51,7 +51,8 @@ namespace AetherEngine::Rendering {
         createGraphicsPipeline();
         createFramebuffers();
         createTransferCommandPool();
-        createBuffers();
+        createVertexBuffer();
+        createIndexBuffer();
         createCommandPool();
         createCommandBuffers();
         createSyncObjects();
@@ -74,6 +75,8 @@ namespace AetherEngine::Rendering {
 
         vkDestroyBuffer(device, m_vertexBuffer, nullptr);
         vkFreeMemory(device, m_vertexBufferMemory, nullptr);
+        vkDestroyBuffer(device, m_indexBuffer, nullptr);
+        vkFreeMemory(device, m_indexBufferMemory, nullptr);
 
         vkDestroyCommandPool(device, m_commandPool, nullptr);
         vkDestroyPipeline(device, m_graphicsPipeline, nullptr);
@@ -379,7 +382,7 @@ namespace AetherEngine::Rendering {
         }
     }
 
-    void Renderer::createBuffers() {
+    void Renderer::createVertexBuffer() {
         VkDeviceSize vertexBufferSize = sizeof(m_vertices[0]) * m_vertices.size();
         
         // Craete Staging Buffer
@@ -410,6 +413,43 @@ namespace AetherEngine::Rendering {
 
         // Copy Vertices
         copyBuffer(stagingBuffer, m_vertexBuffer, vertexBufferSize);
+
+        // Cleanup
+        vkDestroyBuffer(m_deviceContext.getDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(m_deviceContext.getDevice(), stagingBufferMemory, nullptr);
+    }
+
+    void Renderer::createIndexBuffer() {
+        VkDeviceSize indexBufferSize = sizeof(m_indices[0]) * m_indices.size();
+        
+        // Craete Staging Buffer
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        createBuffer(
+            indexBufferSize, 
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+            stagingBuffer, 
+            stagingBufferMemory
+        );
+
+        // TODO: refactor
+        void* data; // TODO
+        vkMapMemory(m_deviceContext.getDevice(), stagingBufferMemory, 0, indexBufferSize, 0, &data);
+            memcpy(data, m_indices.data(), (size_t) indexBufferSize);
+        vkUnmapMemory(m_deviceContext.getDevice(), stagingBufferMemory);
+
+        // Create IndexBuffer
+        createBuffer(
+            indexBufferSize, 
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            m_indexBuffer,
+            m_indexBufferMemory
+        );
+
+        // Copy Indices
+        copyBuffer(stagingBuffer, m_indexBuffer, indexBufferSize);
 
         // Cleanup
         vkDestroyBuffer(m_deviceContext.getDevice(), stagingBuffer, nullptr);
@@ -567,7 +607,11 @@ namespace AetherEngine::Rendering {
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-        vkCmdDraw(commandBuffer,  static_cast<uint32_t>(m_vertices.size()), 1, 0, 0);
+        // Bind IndexBuffer
+        vkCmdBindIndexBuffer(commandBuffer, m_indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
+        // vkCmdDraw(commandBuffer,  static_cast<uint32_t>(m_vertices.size()), 1, 0, 0);
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
 
         vkCmdEndRenderPass(commandBuffer);
 
