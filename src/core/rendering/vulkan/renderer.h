@@ -25,10 +25,12 @@ namespace AetherEngine::Rendering {
         void createRenderPass();
         void createRenderPass2();
         void createShaderModules();
+        void createDescriptorSetLayout();
         void createGraphicsPipeline();
         void createFramebuffers();
         void createVertexBuffer();
         void createIndexBuffer();
+        void createUniformBuffers();
         void createTransferCommandPool();
         void createCommandPool();
         void createCommandBuffers();
@@ -36,6 +38,7 @@ namespace AetherEngine::Rendering {
 
         void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
         void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+        void updateUniformBuffer(uint32_t currentImage);
         void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 
         VulkanDeviceContext& m_deviceContext;
@@ -45,13 +48,22 @@ namespace AetherEngine::Rendering {
         VkShaderModule m_fragmentShaderModule = VK_NULL_HANDLE;
 
         VkRenderPass m_renderPass = VK_NULL_HANDLE;
+        VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
         VkPipelineLayout m_graphicsPipelineLayout = VK_NULL_HANDLE;
         VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
 
+        // TODO: for performance i should use on VkBuffer for Verticies and offset for this
+        // It is even possible to reuse the same chunk of memory for multiple resources if 
+        // they are not used during the same render operations, provided that their data is refreshed.
+        // It calls Aliasing
         VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
         VkBuffer m_indexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_indexBufferMemory = VK_NULL_HANDLE;
+
+        std::vector<VkBuffer> m_uniformBuffers;
+        std::vector<VkDeviceMemory> m_uniformBuffersMemory;
+        std::vector<void*> m_uniformBuffersMapped;
 
         VkCommandPool m_commandPool = VK_NULL_HANDLE;
         VkCommandPool m_transferCommandPool = VK_NULL_HANDLE;

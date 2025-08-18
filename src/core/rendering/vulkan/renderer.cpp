@@ -1,3 +1,5 @@
+#define GLM_FORCE_RADIANS
+
 #include "renderer.h"
 #include <stdexcept>
 #include <array>
@@ -5,6 +7,8 @@
 #include <vector>
 #include <filesystem>
 #include <iostream>
+#include <glm/gtc/matrix_transform.hpp>
+#include <chrono>
 
 #include "../objects/vertex.h"
 
@@ -48,11 +52,13 @@ namespace AetherEngine::Rendering {
 
         createRenderPass();
         createShaderModules();
+        createDescriptorSetLayout();
         createGraphicsPipeline();
         createFramebuffers();
         createTransferCommandPool();
         createVertexBuffer();
         createIndexBuffer();
+        createUniformBuffers();
         createCommandPool();
         createCommandBuffers();
         createSyncObjects();
@@ -72,6 +78,10 @@ namespace AetherEngine::Rendering {
         for (auto framebuffer : m_frameBuffers) {
             vkDestroyFramebuffer(device, framebuffer, nullptr);
         }
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroyBuffer(device, m_uniformBuffers[i], nullptr);
+            vkFreeMemory(device, m_uniformBuffersMemory[i], nullptr);
+        }
 
         vkDestroyBuffer(device, m_vertexBuffer, nullptr);
         vkFreeMemory(device, m_vertexBufferMemory, nullptr);
@@ -79,6 +89,7 @@ namespace AetherEngine::Rendering {
         vkFreeMemory(device, m_indexBufferMemory, nullptr);
 
         vkDestroyCommandPool(device, m_commandPool, nullptr);
+        vkDestroyDescriptorSetLayout(device, m_descriptorSetLayout, nullptr);
         vkDestroyPipeline(device, m_graphicsPipeline, nullptr);
         vkDestroyPipelineLayout(device, m_graphicsPipelineLayout, nullptr);
         vkDestroyShaderModule(device, m_vertexShaderModule, nullptr);
@@ -187,7 +198,7 @@ namespace AetherEngine::Rendering {
         // Create ShaderModules
         // Create Vertex ShaderModule
         // TODO: change
-        const std::vector<char> vertexCode = readShaderFile("../../../src/core/rendering/compiled_shaders/triangle_vert.spv"); // TODO: normal directory finding
+        const std::vector<char> vertexCode = readShaderFile("../../../src/core/rendering/compiled_shaders/standard_vertex_shader.spv"); // TODO: normal directory finding
 
         VkShaderModuleCreateInfo vertexShaderModuleCreateInfo{};
         vertexShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -200,7 +211,7 @@ namespace AetherEngine::Rendering {
 
         // Create Fragment ShaderModule 
         // TODO: change
-        const std::vector<char> fragmentCode = readShaderFile("../../../src/core/rendering/compiled_shaders/triangle_frag.spv"); // TODO: normal directory finding
+        const std::vector<char> fragmentCode = readShaderFile("../../../src/core/rendering/compiled_shaders/standard_fragment_shader.spv"); // TODO: normal directory finding
 
         VkShaderModuleCreateInfo fragmentShaderModuleCreateInfo{};
         fragmentShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -211,6 +222,24 @@ namespace AetherEngine::Rendering {
 
         vkCreateShaderModule(m_deviceContext.getDevice(), &fragmentShaderModuleCreateInfo, nullptr, &m_fragmentShaderModule);
 
+    }
+
+    void Renderer::createDescriptorSetLayout() {
+        VkDescriptorSetLayoutBinding uboLayoutBinding{};
+        uboLayoutBinding.binding = 0; // is it??
+        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // TODO: learn descriptor types
+        uboLayoutBinding.descriptorCount = 1;
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        uboLayoutBinding.pImmutableSamplers = nullptr; // TODO: images/textures
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 1;
+        layoutInfo.pBindings = &uboLayoutBinding;
+
+        if (vkCreateDescriptorSetLayout(m_deviceContext.getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayout) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create descriptor set layout!");
+        }
     }
 
     void Renderer::createGraphicsPipeline() {
@@ -320,8 +349,8 @@ namespace AetherEngine::Rendering {
         // Create Pipeline Layout
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = 0; // TODO
-        pipelineLayoutInfo.pSetLayouts = nullptr; // TODO
+        pipelineLayoutInfo.setLayoutCount = 1; // TODO: auto?
+        pipelineLayoutInfo.pSetLayouts = &m_descriptorSetLayout;
         pipelineLayoutInfo.pushConstantRangeCount = 0; // TODO
         pipelineLayoutInfo.pPushConstantRanges = nullptr; // TODO
 
@@ -454,6 +483,26 @@ namespace AetherEngine::Rendering {
         // Cleanup
         vkDestroyBuffer(m_deviceContext.getDevice(), stagingBuffer, nullptr);
         vkFreeMemory(m_deviceContext.getDevice(), stagingBufferMemory, nullptr);
+    }
+
+    void Renderer::createUniformBuffers() {
+        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+        m_uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        m_uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        m_uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            createBuffer(
+                bufferSize, 
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+                m_uniformBuffers[i], 
+                m_uniformBuffersMemory[i]
+            );
+
+            vkMapMemory(m_deviceContext.getDevice(), m_uniformBuffersMemory[i], 0, bufferSize, 0, &m_uniformBuffersMapped[i]);
+        }
     }
 
     void Renderer::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
@@ -620,6 +669,23 @@ namespace AetherEngine::Rendering {
         }
     }
 
+    void Renderer::updateUniformBuffer(uint32_t currentImage) {
+        static auto startTime = std::chrono::high_resolution_clock::now();
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        UniformBufferObject ubo{};
+        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.proj = glm::perspective(glm::radians(45.0f), m_swapchainContext.getExtent().width / (float) m_swapchainContext.getExtent().height, 0.1f, 10.0f);
+        ubo.proj[1][1] *= -1;
+
+        memcpy(m_uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+        // Using a UBO this way is not the most efficient way to pass frequently changing values to the shader. 
+        // A more efficient way to pass a small buffer of data to shaders are push constants
+    }
+
     void Renderer::createSyncObjects() {
         m_imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         m_renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -654,6 +720,8 @@ namespace AetherEngine::Rendering {
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             throw std::runtime_error("Failed to acquire swapchain image!");
         }
+
+        updateUniformBuffer(currentFrame);
 
         vkResetCommandBuffer(m_commandBuffers[imageIndex], 0);
         recordCommandBuffer(m_commandBuffers[imageIndex], imageIndex);
