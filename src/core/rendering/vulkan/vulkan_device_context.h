@@ -1,10 +1,10 @@
+#ifndef AETHERENGINE_RENDERING_DEVICECONTEXT_H
+#define AETHERENGINE_RENDERING_DEVICECONTEXT_H
+
 #include <vulkan/vulkan.hpp>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 #include "structs.h"
-
-#ifndef AETHERENGINE_RENDERING_DEVICECONTEXT_H
-#define AETHERENGINE_RENDERING_DEVICECONTEXT_H
 
 namespace AetherEngine::Rendering {
     class VulkanDeviceContext {

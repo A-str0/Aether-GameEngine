@@ -1,9 +1,9 @@
+#ifndef AETHERENGINE_RENDERING_VULKANCONTEXT_H
+#define AETHERENGINE_RENDERING_VULKANCONTEXT_H
+
 #include <vulkan/vulkan.hpp>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
-
-#ifndef AETHERENGINE_RENDERING_VULKANCONTEXT_H
-#define AETHERENGINE_RENDERING_VULKANCONTEXT_H
 
 namespace AetherEngine::Rendering {
     class VulkanContext {

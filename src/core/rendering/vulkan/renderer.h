@@ -1,11 +1,12 @@
+#ifndef AETHERENGINE_RENDERING_RENDERER_H
+#define AETHERENGINE_RENDERING_RENDERER_H
+
 #include "vulkan_device_context.h"
 #include "vulkan_swapchain_context.h"
-#include "../objects/vertex.h"
 #include <vulkan/vulkan.hpp>
 #include <vector>
 
-#ifndef AETHERENGINE_RENDERING_RENDERER_H
-#define AETHERENGINE_RENDERING_RENDERER_H
+#include "../objects/vertex.h" // TODO: change
 
 namespace AetherEngine::Rendering {
     class Renderer {

@@ -1,11 +1,8 @@
-#include <vulkan/vulkan.hpp>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_vulkan.h>
-#include "vulkan_device_context.h"
-#include "../../window_context.h"
-
 #ifndef AETHERENGINE_RENDERING_SWAPCHAINCONTEXT_H
 #define AETHERENGINE_RENDERING_SWAPCHAINCONTEXT_H
+
+#include "vulkan_device_context.h"
+#include "../../window_context.h" // TODO: change
 
 namespace AetherEngine::Rendering {
     class VulkanSwapchainContext {

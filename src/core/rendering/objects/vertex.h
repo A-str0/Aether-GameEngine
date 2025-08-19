@@ -1,9 +1,9 @@
+#ifndef AETHERENGINE_RENDERIG_OBJECTS_VERTEX_H
+#define AETHERENGINE_RENDERIG_OBJECTS_VERTEX_H
+
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
 #include <array>
-
-#ifndef AETHERENGINE_RENDERIG_OBJECTS_VERTEX_H
-#define AETHERENGINE_RENDERIG_OBJECTS_VERTEX_H
 
 namespace AetherEngine::Rendering::Objects {
     struct Vertex {
