@@ -774,13 +774,7 @@ namespace AetherEngine::Rendering {
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(m_deviceContext.getDevice(), m_swapchainContext.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-            m_swapchainContext.recreateSwapchain();
-
-            // TODO: refactor
-            vkDestroyDescriptorPool(m_deviceContext.getDevice(), m_descriptorPool, nullptr);
-            createDescriptorPool();
-            createDescriptorSets();
-            return; // TODO: change?
+            // m_swapchainContext.recreateSwapchain();
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             throw std::runtime_error("Failed to acquire swapchain image!");
         }
@@ -821,6 +815,7 @@ namespace AetherEngine::Rendering {
         result = vkQueuePresentKHR(m_deviceContext.getPresentQueue(), &presentInfo);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
             // Handle swapchain recreation
+            m_swapchainContext.recreateSwapchain();
         } else if (result != VK_SUCCESS) {
             throw std::runtime_error("Failed to present swapchain image!");
         }
