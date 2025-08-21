@@ -21,6 +21,8 @@ namespace AetherEngine::Rendering {
         VkFormat getFormat() const { return m_format; }
         VkExtent2D getExtent() const { return m_extent; }
 
+        VkImageView createImageView(VkImage image, VkFormat format);
+
         void recreateSwapchain();
     private:
         VkSurfaceFormatKHR selectSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);

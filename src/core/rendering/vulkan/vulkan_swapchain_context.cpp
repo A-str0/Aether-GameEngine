@@ -55,6 +55,27 @@ namespace AetherEngine::Rendering {
         }
     }
 
+    VkImageView VulkanSwapchainContext::createImageView(VkImage image, VkFormat format) {
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = format;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+        // viewInfo.componsents = 0; // TODO
+
+        VkImageView imageView;
+        if (vkCreateImageView(m_deviceContext->getDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create image view!");
+        }
+
+        return imageView;
+    }
+
     void VulkanSwapchainContext::createSwapchain() {
         VkPhysicalDevice physicalDevice = m_deviceContext->getPhysicalDevice();
         VkDevice device = m_deviceContext->getDevice();
@@ -137,20 +158,7 @@ namespace AetherEngine::Rendering {
         // Get image views
         m_imageViews.resize(imageCount);
         for (size_t i = 0; i < imageCount; ++i) {
-            VkImageViewCreateInfo viewInfo{};
-            viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            viewInfo.image = m_images[i];
-            viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            viewInfo.format = m_format;
-            viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            viewInfo.subresourceRange.baseMipLevel = 0;
-            viewInfo.subresourceRange.levelCount = 1;
-            viewInfo.subresourceRange.baseArrayLayer = 0;
-            viewInfo.subresourceRange.layerCount = 1;
-
-            if (vkCreateImageView(device, &viewInfo, nullptr, &m_imageViews[i]) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to create ImageView");
-            }
+            m_imageViews[i] = createImageView(m_images[i], m_format);
         }
     }
 

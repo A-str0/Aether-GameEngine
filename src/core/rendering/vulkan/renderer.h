@@ -50,6 +50,9 @@ namespace AetherEngine::Rendering {
         void loadImage();
         void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
         void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+        void createTextureImageView();
+        void createTextureSampler();
+        VkImageView createImageView(VkImage image, VkFormat format);
 
         VulkanDeviceContext& m_deviceContext;
         VulkanSwapchainContext& m_swapchainContext;
@@ -90,16 +93,18 @@ namespace AetherEngine::Rendering {
 
         // TODO: refactor
         const std::vector<Objects::Vertex> m_vertices = {
-            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-            {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-            {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
+            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+            {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+            {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
         };
         const std::vector<uint16_t> m_indices = {
             0, 1, 2, 2, 3, 0
         };
         VkImage m_textureImage;
         VkDeviceMemory m_textureImageMemory;
+        VkImageView m_textureImageView;
+        VkSampler m_textureSampler;
     };
 }
 

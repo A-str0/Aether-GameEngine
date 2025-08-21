@@ -23,6 +23,7 @@ int main() {
     AetherEngine::Rendering::VulkanContext vulkanContext {extensions};
     windowContext.recreateSurface(vulkanContext);
 
+    // TODO: refactor
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(vulkanContext.getInstance(), &deviceCount, nullptr);
     if (deviceCount == 0) {
@@ -30,8 +31,19 @@ int main() {
     }
     std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
     vkEnumeratePhysicalDevices(vulkanContext.getInstance(), &deviceCount, physicalDevices.data());
-    VkPhysicalDevice physicalDevice = physicalDevices[0]; // TODO: cooler selection
-    
+
+    VkPhysicalDevice physicalDevice{};
+    for (uint32_t i = 0; i < deviceCount; ++i) {
+        physicalDevice = physicalDevices[i];
+
+        VkPhysicalDeviceFeatures supportedFeatures;
+        vkGetPhysicalDeviceFeatures(physicalDevice, &supportedFeatures);
+
+        if (supportedFeatures.samplerAnisotropy) {
+            break;
+        }
+    }
+
     AetherEngine::Rendering::VulkanDeviceContext deviceContext {physicalDevice, windowContext.getSurface()};
     AetherEngine::Rendering::VulkanSwapchainContext swapchainContext {deviceContext, windowContext};
     AetherEngine::Rendering::Renderer renderer {deviceContext, swapchainContext, windowContext.getSurface()};
