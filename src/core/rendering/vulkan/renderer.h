@@ -43,6 +43,13 @@ namespace AetherEngine::Rendering {
         void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
         void updateUniformBuffer(uint32_t currentImage);
         void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+        VkCommandBuffer beginSingleTimeCommands();
+        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+
+        // void loadImage(int &width, int &height, VkDeviceSize imageSize, u_char* imageData, void(*func_ptr)(u_char*));
+        void loadImage();
+        void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+        void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
         VulkanDeviceContext& m_deviceContext;
         VulkanSwapchainContext& m_swapchainContext;
@@ -91,6 +98,8 @@ namespace AetherEngine::Rendering {
         const std::vector<uint16_t> m_indices = {
             0, 1, 2, 2, 3, 0
         };
+        VkImage m_textureImage;
+        VkDeviceMemory m_textureImageMemory;
     };
 }
 

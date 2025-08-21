@@ -3,6 +3,7 @@
 #include "core/rendering/vulkan/vulkan_device_context.h"
 #include "core/rendering/vulkan/vulkan_swapchain_context.h"
 #include "core/rendering/vulkan/renderer.h"
+#include "core/resources/resource_manager.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>

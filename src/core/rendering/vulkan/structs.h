@@ -1,8 +1,8 @@
-#include <vulkan/vulkan.hpp>
-#include <glm/glm.hpp>
-
 #ifndef AETHERENGINE_QUEUEFAMILYINDICIESSTRUCT_H
 #define AETHERENGINE_QUEUEFAMILYINDICIESSTRUCT_H
+
+#include <vulkan/vulkan.hpp>
+#include <glm/glm.hpp>
 
 namespace AetherEngine {
     struct QueueFamilyIndices {
