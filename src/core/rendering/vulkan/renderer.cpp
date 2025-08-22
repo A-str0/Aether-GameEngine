@@ -264,13 +264,13 @@ namespace AetherEngine::Rendering {
 
         // Create Rendering States
         // Create VertexInput
-        auto bindingDescription = Objects::Vertex::getBindingDescription();
-        auto attributeDescriptions = Objects::Vertex::getAttributeDescriptions();
-
         VkPipelineVertexInputStateCreateInfo vertexInput{};
         vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
         vertexInput.pNext = nullptr;
         vertexInput.vertexBindingDescriptionCount = 1;
+
+        auto bindingDescription = Objects::Vertex::getBindingDescription();
+        auto attributeDescriptions = Objects::Vertex::getAttributeDescriptions();
         vertexInput.pVertexBindingDescriptions = &bindingDescription; // TODO
         vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
         vertexInput.pVertexAttributeDescriptions = attributeDescriptions.data();
@@ -781,10 +781,11 @@ namespace AetherEngine::Rendering {
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
+        // TODO: refactor
         UniformBufferObject ubo{};
         ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.proj = glm::perspective(glm::radians(45.0f), m_swapchainContext.getExtent().width / (float) m_swapchainContext.getExtent().height, 0.1f, 10.0f);
+        ubo.view = glm::lookAt(glm::vec3(2.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.proj = glm::perspective(glm::radians(35.0f), m_swapchainContext.getExtent().width / (float) m_swapchainContext.getExtent().height, 0.1f, 10.0f);
         ubo.proj[1][1] *= -1;
 
         // Using a UBO this way is not the most efficient way to pass frequently changing values to the shader. 
