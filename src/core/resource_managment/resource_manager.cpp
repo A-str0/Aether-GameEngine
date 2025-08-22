@@ -3,7 +3,7 @@
 #include "resource_manager.h"
 #include <stb/stb_image.h>
 
-namespace AetherEngine::Resources {
+namespace AetherEngine::ResourceManagment {
     ResourceManager::ResourceManager() {
         
     }

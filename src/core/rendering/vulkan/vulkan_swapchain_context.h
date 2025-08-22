@@ -2,7 +2,7 @@
 #define AETHERENGINE_RENDERING_SWAPCHAINCONTEXT_H
 
 #include "vulkan_device_context.h"
-#include "../../window_context.h" // TODO: change
+#include "../../window_managment/window_context.h" // TODO: change
 
 namespace AetherEngine::Rendering {
     class VulkanSwapchainContext {

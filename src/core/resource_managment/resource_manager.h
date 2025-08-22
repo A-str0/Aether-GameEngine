@@ -7,14 +7,19 @@
 #define STB_IMAGE_IMPLEMENTATION
 #endif
 
-namespace AetherEngine::Resources {
+namespace AetherEngine::ResourceManagment {
     class ResourceManager {
     public:
         ResourceManager();
         // ~ResourceManager(); 
 
+        void loadShader(std::string filename);
         u_char* loadTexture(std::string filename);
+
+        void unloadShader();
         void unloadTexture(u_char* pixels);
+    private:
+        
     };
 }
 

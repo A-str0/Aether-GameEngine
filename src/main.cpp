@@ -1,9 +1,9 @@
-#include "core/window_context.h"
+#include "core/window_managment/window_context.h"
 #include "core/rendering/vulkan/vulkan_context.h"
 #include "core/rendering/vulkan/vulkan_device_context.h"
 #include "core/rendering/vulkan/vulkan_swapchain_context.h"
 #include "core/rendering/vulkan/renderer.h"
-#include "core/resources/resource_manager.h"
+#include "core/resource_manager.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
@@ -11,7 +11,6 @@
 #include <stdexcept>
 #include <vector>
 #include <string>
-
 
 int main() {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {

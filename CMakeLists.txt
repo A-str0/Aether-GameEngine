@@ -7,12 +7,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Set Executable files
 set(SOURCE_FILES
-    "src/core/window_context.cpp"
+    "src/core/window_managment/window_context.cpp"
     "src/core/rendering/vulkan/vulkan_context.cpp"
     "src/core/rendering/vulkan/vulkan_device_context.cpp"
     "src/core/rendering/vulkan/vulkan_swapchain_context.cpp"
     "src/core/rendering/vulkan/renderer.cpp"
-    "src/core/resources/resource_manager.cpp"
+    "src/core/resource_manager.cpp"
     "src/main.cpp"
 )
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
