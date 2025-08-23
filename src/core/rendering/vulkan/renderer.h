@@ -5,6 +5,7 @@
 #include "vulkan_swapchain_context.h"
 #include <vulkan/vulkan.hpp>
 #include <vector>
+#include <memory>
 
 #include "../objects/vertex.h" // TODO: change
 
@@ -21,7 +22,10 @@ namespace AetherEngine::Rendering {
         Renderer& operator=(Renderer&&) noexcept = default;
 
         void drawFrame();
+        void updateDescriptorSets(VkImageView imageView);
 
+        VkCommandBuffer beginSingleTimeCommands();
+        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
     private:
         void createRenderPass();
         void createRenderPass2();
@@ -38,21 +42,11 @@ namespace AetherEngine::Rendering {
         void createCommandPool();
         void createCommandBuffers();
         void createSyncObjects();
+        void createTextureSampler();
 
         void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
         void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
         void updateUniformBuffer(uint32_t currentImage);
-        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
-        VkCommandBuffer beginSingleTimeCommands();
-        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-
-        // void loadImage(int &width, int &height, VkDeviceSize imageSize, u_char* imageData, void(*func_ptr)(u_char*));
-        void loadImage();
-        void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
-        void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-        void createTextureImageView();
-        void createTextureSampler();
-        VkImageView createImageView(VkImage image, VkFormat format);
 
         VulkanDeviceContext& m_deviceContext;
         VulkanSwapchainContext& m_swapchainContext;
@@ -63,6 +57,7 @@ namespace AetherEngine::Rendering {
         VkRenderPass m_renderPass = VK_NULL_HANDLE;
         VkPipelineLayout m_graphicsPipelineLayout = VK_NULL_HANDLE;
         VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
+        VkSampler m_textureSampler;
 
         VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
         VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
@@ -101,10 +96,6 @@ namespace AetherEngine::Rendering {
         const std::vector<uint16_t> m_indices = {
             0, 1, 2, 2, 3, 0
         };
-        VkImage m_textureImage;
-        VkDeviceMemory m_textureImageMemory;
-        VkImageView m_textureImageView;
-        VkSampler m_textureSampler;
     };
 }
 

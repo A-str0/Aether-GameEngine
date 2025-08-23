@@ -12,7 +12,7 @@ set(SOURCE_FILES
     "src/core/rendering/vulkan/vulkan_device_context.cpp"
     "src/core/rendering/vulkan/vulkan_swapchain_context.cpp"
     "src/core/rendering/vulkan/renderer.cpp"
-    "src/core/resource_manager.cpp"
+    "src/core/resource_managment/resource_manager.cpp"
     "src/main.cpp"
 )
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})

@@ -3,7 +3,7 @@
 #include "core/rendering/vulkan/vulkan_device_context.h"
 #include "core/rendering/vulkan/vulkan_swapchain_context.h"
 #include "core/rendering/vulkan/renderer.h"
-#include "core/resource_manager.h"
+#include "core/resource_managment/resource_manager.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
@@ -46,6 +46,10 @@ int main() {
     AetherEngine::Rendering::VulkanDeviceContext deviceContext {physicalDevice, windowContext.getSurface()};
     AetherEngine::Rendering::VulkanSwapchainContext swapchainContext {deviceContext, windowContext};
     AetherEngine::Rendering::Renderer renderer {deviceContext, swapchainContext, windowContext.getSurface()};
+    AetherEngine::ResourceManagment::ResourceManager resourceManager {deviceContext, swapchainContext, renderer};
+
+    auto texture = resourceManager.loadTexture("../../../src/core/rendering/textures/tex.jpg");
+    renderer.updateDescriptorSets(texture->imageView);
 
     bool running = true;
     SDL_Event event;
@@ -60,6 +64,9 @@ int main() {
         }
         renderer.drawFrame();
     }
+
+    // TODO: change?
+    texture->cleanup(deviceContext.getDevice());
 
     SDL_Quit();
     return 0;
