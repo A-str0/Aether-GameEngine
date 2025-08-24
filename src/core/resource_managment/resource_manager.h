@@ -10,6 +10,7 @@
 #include "objects/ae_object.h" // TODO: change
 #include "../rendering/vulkan/vulkan_device_context.h" // TODO: change
 #include "../rendering/vulkan/renderer.h" // TODO: change
+#include "../rendering/vulkan/objects/model.hpp" // TODO: change
 
 namespace AetherEngine::ResourceManagment {
     class ResourceManager {
@@ -31,6 +32,12 @@ namespace AetherEngine::ResourceManagment {
         // TODO: move onto the ECS
         std::shared_ptr<Objects::AE_Object> craeteObject(std::string name);
         void deleteObject(std::string name);
+
+        // Model management
+        std::shared_ptr<Rendering::Objects::Model> createQuadModel();
+        void addModel(std::shared_ptr<Rendering::Objects::Model> model);
+        void removeModel(std::shared_ptr<Rendering::Objects::Model> model);
+        const std::vector<std::shared_ptr<Rendering::Objects::Model>>& getModels() const;
     private:
         Rendering::VulkanDeviceContext& m_deviceContext;
         Rendering::VulkanSwapchainContext& m_swapchainContext;
@@ -38,6 +45,7 @@ namespace AetherEngine::ResourceManagment {
 
         std::unordered_map<std::string, std::weak_ptr<Objects::TextureResource>> m_textureCache;
         std::unordered_map<std::string, std::weak_ptr<Objects::AE_Object>> m_objectsCache;
+        std::vector<std::shared_ptr<Rendering::Objects::Model>> m_models;
 
         void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
         void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);

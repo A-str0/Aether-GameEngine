@@ -51,6 +51,13 @@ int main() {
     auto texture = resourceManager.loadTexture("../../../src/core/rendering/textures/tex.jpg");
     renderer.updateDescriptorSets(texture->imageView);
 
+    // Create a vector to hold models
+    std::vector<std::shared_ptr<AetherEngine::Rendering::Objects::Model>> models;
+
+    // Create quad model using ResourceManager
+    auto quadModel = resourceManager.createQuadModel();
+    models.push_back(quadModel);
+
     bool running = true;
     SDL_Event event;
     while (running) {
@@ -62,7 +69,7 @@ int main() {
             //     recreateSwapchain();
             // }
         }
-        renderer.drawFrame();
+        renderer.drawFrame(models);
     }
 
     // TODO: change?

@@ -185,4 +185,117 @@ namespace AetherEngine::ResourceManagment {
 
         m_renderer.endSingleTimeCommands(commandBuffer);
     }
+
+    // Model management methods
+    std::shared_ptr<Rendering::Objects::Model> ResourceManager::createQuadModel() {
+        // Create quad vertices and indices
+        std::vector<Rendering::Objects::Vertex> quadVertices = {
+            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+            {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+            {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+        };
+        std::vector<uint16_t> quadIndices = {0, 1, 2, 2, 3, 0};
+
+        // Create vertex buffer
+        VkBuffer vertexBuffer;
+        VkDeviceMemory vertexBufferMemory;
+        VkDeviceSize vertexBufferSize = sizeof(quadVertices[0]) * quadVertices.size();
+        
+        m_deviceContext.createBuffer(
+            vertexBufferSize,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            vertexBuffer,
+            vertexBufferMemory
+        );
+
+        // Create index buffer
+        VkBuffer indexBuffer;
+        VkDeviceMemory indexBufferMemory;
+        VkDeviceSize indexBufferSize = sizeof(quadIndices[0]) * quadIndices.size();
+        
+        m_deviceContext.createBuffer(
+            indexBufferSize,
+            VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            indexBuffer,
+            indexBufferMemory
+        );
+
+        // Copy vertex data to buffer using staging buffer
+        VkBuffer vertexStagingBuffer;
+        VkDeviceMemory vertexStagingBufferMemory;
+        m_deviceContext.createBuffer(
+            vertexBufferSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            vertexStagingBuffer,
+            vertexStagingBufferMemory
+        );
+
+        void* vertexData;
+        vkMapMemory(m_deviceContext.getDevice(), vertexStagingBufferMemory, 0, vertexBufferSize, 0, &vertexData);
+        memcpy(vertexData, quadVertices.data(), static_cast<size_t>(vertexBufferSize));
+        vkUnmapMemory(m_deviceContext.getDevice(), vertexStagingBufferMemory);
+
+        // Copy index data to buffer using staging buffer
+        VkBuffer indexStagingBuffer;
+        VkDeviceMemory indexStagingBufferMemory;
+        m_deviceContext.createBuffer(
+            indexBufferSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            indexStagingBuffer,
+            indexStagingBufferMemory
+        );
+
+        void* indexData;
+        vkMapMemory(m_deviceContext.getDevice(), indexStagingBufferMemory, 0, indexBufferSize, 0, &indexData);
+        memcpy(indexData, quadIndices.data(), static_cast<size_t>(indexBufferSize));
+        vkUnmapMemory(m_deviceContext.getDevice(), indexStagingBufferMemory);
+
+        // Copy staging buffers to device local buffers
+        m_renderer.copyBuffer(vertexStagingBuffer, vertexBuffer, vertexBufferSize);
+        m_renderer.copyBuffer(indexStagingBuffer, indexBuffer, indexBufferSize);
+
+        // Cleanup staging buffers
+        vkDestroyBuffer(m_deviceContext.getDevice(), vertexStagingBuffer, nullptr);
+        vkFreeMemory(m_deviceContext.getDevice(), vertexStagingBufferMemory, nullptr);
+        vkDestroyBuffer(m_deviceContext.getDevice(), indexStagingBuffer, nullptr);
+        vkFreeMemory(m_deviceContext.getDevice(), indexStagingBufferMemory, nullptr);
+
+        // Create material (using default constructor for now)
+        Rendering::Objects::Material* material = new Rendering::Objects::Material();
+
+        // Create transform matrix (identity matrix)
+        glm::mat4 transform = glm::mat4(1.0f);
+
+        // Create and return the model
+        auto model = std::make_shared<Rendering::Objects::Model>(
+            vertexBuffer,
+            indexBuffer,
+            quadVertices,
+            quadIndices,
+            material,
+            transform
+        );
+
+        return model;
+    }
+
+    void ResourceManager::addModel(std::shared_ptr<Rendering::Objects::Model> model) {
+        m_models.push_back(model);
+    }
+
+    void ResourceManager::removeModel(std::shared_ptr<Rendering::Objects::Model> model) {
+        auto it = std::find(m_models.begin(), m_models.end(), model);
+        if (it != m_models.end()) {
+            m_models.erase(it);
+        }
+    }
+
+    const std::vector<std::shared_ptr<Rendering::Objects::Model>>& ResourceManager::getModels() const {
+        return m_models;
+    }
 }

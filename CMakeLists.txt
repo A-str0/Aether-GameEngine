@@ -18,7 +18,10 @@ set(SOURCE_FILES
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
 # Set include directories
-target_include_directories(${PROJECT_NAME} PRIVATE "thirdparty")
+target_include_directories(${PROJECT_NAME} PRIVATE 
+    "thirdparty"
+    ""
+)
 
 # Link Vulkan
 find_package(Vulkan REQUIRED)

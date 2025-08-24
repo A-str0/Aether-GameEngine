@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "../objects/vertex.h" // TODO: change
+#include "objects/model.hpp" // TODO: change
 
 namespace AetherEngine::Rendering {
     class Renderer {
@@ -21,11 +22,12 @@ namespace AetherEngine::Rendering {
         Renderer(Renderer&&) noexcept = default;
         Renderer& operator=(Renderer&&) noexcept = default;
 
-        void drawFrame();
+        void drawFrame(const std::vector<std::shared_ptr<Objects::Model>>& models);
         void updateDescriptorSets(VkImageView imageView);
 
         VkCommandBuffer beginSingleTimeCommands();
         void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+        void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     private:
         void createRenderPass();
         void createRenderPass2();
@@ -33,8 +35,8 @@ namespace AetherEngine::Rendering {
         void createDescriptorSetLayout();
         void createGraphicsPipeline();
         void createFramebuffers();
-        void createVertexBuffer();
-        void createIndexBuffer();
+        // void createVertexBuffer();
+        // void createIndexBuffer();
         void createUniformBuffers();
         void createDescriptorPool();
         void createDescriptorSets();
@@ -43,9 +45,7 @@ namespace AetherEngine::Rendering {
         void createCommandBuffers();
         void createSyncObjects();
         void createTextureSampler();
-
-        void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-        void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+        void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, const std::vector<std::shared_ptr<Objects::Model>>& models);
         void updateUniformBuffer(uint32_t currentImage);
 
         VulkanDeviceContext& m_deviceContext;

@@ -14,6 +14,7 @@
 
 #include "../objects/vertex.h" // TODO: change
 #include "../../resource_managment/objects/texture_resource.h" // TODO: change
+#include <src/core/rendering/vulkan/objects/model.hpp>
 
 #define MAX_FRAMES_IN_FLIGHT 2
 
@@ -64,8 +65,6 @@ namespace AetherEngine::Rendering {
         createSyncObjects();
         createTextureSampler();
 
-        createVertexBuffer();
-        createIndexBuffer();
         createUniformBuffers();
         createDescriptorPool();
         createDescriptorSets();
@@ -93,10 +92,11 @@ namespace AetherEngine::Rendering {
 
         vkDestroySampler(device, m_textureSampler, nullptr);
 
-        vkDestroyBuffer(device, m_vertexBuffer, nullptr);
-        vkFreeMemory(device, m_vertexBufferMemory, nullptr);
-        vkDestroyBuffer(device, m_indexBuffer, nullptr);
-        vkFreeMemory(device, m_indexBufferMemory, nullptr);
+        // Note: Vertex and index buffers are now managed by individual models
+        // vkDestroyBuffer(device, m_vertexBuffer, nullptr);
+        // vkFreeMemory(device, m_vertexBufferMemory, nullptr);
+        // vkDestroyBuffer(device, m_indexBuffer, nullptr);
+        // vkFreeMemory(device, m_indexBufferMemory, nullptr);
 
         vkDestroyCommandPool(device, m_commandPool, nullptr);
         vkDestroyDescriptorPool(device, m_descriptorPool, nullptr);
@@ -405,79 +405,6 @@ namespace AetherEngine::Rendering {
         }
     }
 
-    void Renderer::createVertexBuffer() {
-        VkDeviceSize vertexBufferSize = sizeof(m_vertices[0]) * m_vertices.size();
-        
-        // Craete Staging Buffer
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        m_deviceContext.createBuffer(
-            vertexBufferSize, 
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-            stagingBuffer, 
-            stagingBufferMemory
-        );
-
-        // TODO: refactor
-        void* data; // TODO
-        vkMapMemory(m_deviceContext.getDevice(), stagingBufferMemory, 0, vertexBufferSize, 0, &data);
-            memcpy(data, m_vertices.data(), (size_t) vertexBufferSize);
-        vkUnmapMemory(m_deviceContext.getDevice(), stagingBufferMemory);
-
-        // Create VertexBuffer
-        m_deviceContext.createBuffer(
-            vertexBufferSize, 
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            m_vertexBuffer,
-            m_vertexBufferMemory
-        );
-
-        // Copy Vertices
-        copyBuffer(stagingBuffer, m_vertexBuffer, vertexBufferSize);
-
-        // Cleanup
-        vkDestroyBuffer(m_deviceContext.getDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(m_deviceContext.getDevice(), stagingBufferMemory, nullptr);
-    }
-
-    void Renderer::createIndexBuffer() {
-        VkDeviceSize indexBufferSize = sizeof(m_indices[0]) * m_indices.size();
-        
-        // Craete Staging Buffer
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        m_deviceContext.createBuffer(
-            indexBufferSize, 
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-            stagingBuffer, 
-            stagingBufferMemory
-        );
-
-        // TODO: refactor
-        void* data; // TODO
-        vkMapMemory(m_deviceContext.getDevice(), stagingBufferMemory, 0, indexBufferSize, 0, &data);
-            memcpy(data, m_indices.data(), (size_t) indexBufferSize);
-        vkUnmapMemory(m_deviceContext.getDevice(), stagingBufferMemory);
-
-        // Create IndexBuffer
-        m_deviceContext.createBuffer(
-            indexBufferSize, 
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            m_indexBuffer,
-            m_indexBufferMemory
-        );
-
-        // Copy Indices
-        copyBuffer(stagingBuffer, m_indexBuffer, indexBufferSize);
-
-        // Cleanup
-        vkDestroyBuffer(m_deviceContext.getDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(m_deviceContext.getDevice(), stagingBufferMemory, nullptr);
-    }
 
     void Renderer::createUniformBuffers() {
         VkDeviceSize bufferSize = sizeof(UniformBufferObject);
@@ -645,7 +572,7 @@ namespace AetherEngine::Rendering {
         endSingleTimeCommands(commandBuffer);
     }
 
-    void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+    void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, const std::vector<std::shared_ptr<Rendering::Objects::Model>>& models) {
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -681,21 +608,24 @@ namespace AetherEngine::Rendering {
         scissor.extent = m_swapchainContext.getExtent();
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        // Bind VertexBuffer
-        VkBuffer vertexBuffers[] = {m_vertexBuffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        // Render all models
+        for (const auto& model : models) {
+            // Bind VertexBuffer
+            VkBuffer vertexBuffers[] = {model->getVertexBuffer()};
+            VkDeviceSize offsets[] = {0};
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-        // Bind IndexBuffer
-        vkCmdBindIndexBuffer(commandBuffer, m_indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+            // Bind IndexBuffer
+            vkCmdBindIndexBuffer(commandBuffer, model->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT16);
 
-        // Bind Descriptors
-        // TODO: implement better way than `imageIndex % MAX_FRAMES_IN_FLIGHT`
-        // std::cout << "Binding descriptor set: " << m_descriptorSets[imageIndex % MAX_FRAMES_IN_FLIGHT] << " for image " << imageIndex % MAX_FRAMES_IN_FLIGHT << std::endl;
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 0, 1, &m_descriptorSets[imageIndex % MAX_FRAMES_IN_FLIGHT], 0, nullptr);
+            // Bind Descriptors
+            // TODO: implement better way than `imageIndex % MAX_FRAMES_IN_FLIGHT`
+            // std::cout << "Binding descriptor set: " << m_descriptorSets[imageIndex % MAX_FRAMES_IN_FLIGHT] << " for image " << imageIndex % MAX_FRAMES_IN_FLIGHT << std::endl;
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 0, 1, &m_descriptorSets[imageIndex % MAX_FRAMES_IN_FLIGHT], 0, nullptr);
 
-        // vkCmdDraw(commandBuffer,  static_cast<uint32_t>(m_vertices.size()), 1, 0, 0);
-        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
+            // vkCmdDraw(commandBuffer,  static_cast<uint32_t>(model->vertices.size()), 1, 0, 0);
+            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(model->indices.size()), 1, 0, 0, 0);
+        }
 
         vkCmdEndRenderPass(commandBuffer);
 
@@ -748,7 +678,7 @@ namespace AetherEngine::Rendering {
 
         // TODO: refactor
         UniformBufferObject ubo{};
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 01.0f, 1.0f));
         ubo.view = glm::lookAt(glm::vec3(2.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.proj = glm::perspective(glm::radians(35.0f), m_swapchainContext.getExtent().width / (float) m_swapchainContext.getExtent().height, 0.1f, 10.0f);
         ubo.proj[1][1] *= -1;
@@ -779,7 +709,7 @@ namespace AetherEngine::Rendering {
         }
     }
     
-    void Renderer::drawFrame() {
+    void Renderer::drawFrame(const std::vector<std::shared_ptr<Objects::Model>>& models) {
         static size_t currentFrame = 0;
 
         vkWaitForFences(m_deviceContext.getDevice(), 1, &m_inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
@@ -794,7 +724,7 @@ namespace AetherEngine::Rendering {
         }
 
         vkResetCommandBuffer(m_commandBuffers[imageIndex], 0);
-        recordCommandBuffer(m_commandBuffers[imageIndex], imageIndex);
+        recordCommandBuffer(m_commandBuffers[imageIndex], imageIndex, models);
 
         updateUniformBuffer(currentFrame);
 
