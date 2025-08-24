@@ -99,7 +99,13 @@ namespace AetherEngine::ResourceManagment {
         stbi_image_free(pixels);
     }
 
-     void ResourceManager::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
+    // std::shared_ptr<Objects::AE_Object> craeteObject(std::string name) {
+    //     // TODO: make better way for objects creation (and call it entity)
+    //     auto obj = std::make_shared<Objects::AE_Object>();
+    //     return obj;
+    // }
+
+    void ResourceManager::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
         VkCommandBuffer commandBuffer = m_renderer.beginSingleTimeCommands();
 
         VkImageMemoryBarrier barrier{};
