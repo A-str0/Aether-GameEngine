@@ -32,12 +32,12 @@ namespace AetherEngine::Rendering {
         void createRenderPass();
         void createRenderPass2();
         void createShaderModules();
-        void createDescriptorSetLayout();
         void createGraphicsPipeline();
         void createFramebuffers();
         // void createVertexBuffer();
         // void createIndexBuffer();
         void createUniformBuffers();
+        void createDescriptorSetLayout();
         void createDescriptorPool();
         void createDescriptorSets();
         void createTransferCommandPool();
