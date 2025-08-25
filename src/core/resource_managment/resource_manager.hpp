@@ -9,37 +9,30 @@
 #include <resource_managment/objects/texture_resource.hpp>
 #include <rendering/vulkan/vulkan_device_context.hpp>
 #include <rendering/vulkan/renderer.hpp>
-#include <rendering/vulkan/objects/model.hpp>
+#include <rendering/vulkan/objects/mesh.hpp>
 
 namespace AetherEngine::ResourceManagment {
     class ResourceManager {
     public:
         ResourceManager(
-            Rendering::VulkanDeviceContext& deviceContext, 
-            Rendering::VulkanSwapchainContext& swapchainContext, 
-            Rendering::Renderer& renderer
+            Rendering::VulkanDeviceContext* deviceContext_ptr, 
+            Rendering::VulkanSwapchainContext* swapchainContext_ptr, 
+            Rendering::MemoryManager* memoryManager_ptr
         ) : 
-            m_renderer(renderer), 
-            m_swapchainContext(swapchainContext),
-            m_deviceContext(deviceContext) 
-        {} // TODO: change
+            m_swapchainContext_ptr(swapchainContext_ptr),
+            m_deviceContext_ptr(deviceContext_ptr), 
+            m_memoryManager_ptr(memoryManager_ptr)
+        { } // TODO: change
         // ~ResourceManager(); 
 
         std::shared_ptr<Objects::TextureResource> loadTexture(std::string filename);
         void unloadTexture(u_char* pixels);
 
-        // Model management
-        std::shared_ptr<Rendering::Objects::Model> createQuadModel();
-        void addModel(std::shared_ptr<Rendering::Objects::Model> model);
-        void removeModel(std::shared_ptr<Rendering::Objects::Model> model);
-        const std::vector<std::shared_ptr<Rendering::Objects::Model>>& getModels() const;
-    private:
-        Rendering::VulkanDeviceContext& m_deviceContext;
-        Rendering::VulkanSwapchainContext& m_swapchainContext;
-        Rendering::Renderer& m_renderer;
+        Rendering::VulkanDeviceContext* m_deviceContext_ptr;
+        Rendering::VulkanSwapchainContext* m_swapchainContext_ptr;
+        Rendering::MemoryManager* m_memoryManager_ptr;
 
         std::unordered_map<std::string, std::weak_ptr<Objects::TextureResource>> m_textureCache;
-        std::vector<std::shared_ptr<Rendering::Objects::Model>> m_models;
 
         void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
         void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);

@@ -29,8 +29,6 @@ namespace AetherEngine::Rendering {
         QueueFamilyIndices getQueueFamilyIndicies() const { return m_indices; }
 
         u_int32_t getMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-
-        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
     private:
         QueueFamilyIndices findQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface);
 

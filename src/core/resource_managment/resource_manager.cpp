@@ -22,7 +22,7 @@ namespace AetherEngine::ResourceManagment {
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
 
-        m_deviceContext.createBuffer(
+        m_memoryManager_ptr->createBuffer(
             imageSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
@@ -31,9 +31,9 @@ namespace AetherEngine::ResourceManagment {
         );
 
         void* data;
-        vkMapMemory(m_deviceContext.getDevice(), stagingBufferMemory, 0, imageSize, 0, &data);
+        vkMapMemory(m_deviceContext_ptr->getDevice(), stagingBufferMemory, 0, imageSize, 0, &data);
             memcpy(data, pixels, static_cast<size_t>(imageSize));
-        vkUnmapMemory(m_deviceContext.getDevice(), stagingBufferMemory);
+        vkUnmapMemory(m_deviceContext_ptr->getDevice(), stagingBufferMemory);
 
         // func_ptr(imageData);
         stbi_image_free(pixels);
@@ -55,24 +55,24 @@ namespace AetherEngine::ResourceManagment {
         imageInfo.flags = 0; // TODO
 
         // Set Image
-        if (vkCreateImage(m_deviceContext.getDevice(), &imageInfo, nullptr, &texture->image) != VK_SUCCESS) {
+        if (vkCreateImage(m_deviceContext_ptr->getDevice(), &imageInfo, nullptr, &texture->image) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create image!");
         }
 
         VkMemoryRequirements memRequirements;
-        vkGetImageMemoryRequirements(m_deviceContext.getDevice(), texture->image, &memRequirements);
+        vkGetImageMemoryRequirements(m_deviceContext_ptr->getDevice(), texture->image, &memRequirements);
 
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = m_deviceContext.getMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        allocInfo.memoryTypeIndex = m_deviceContext_ptr->getMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-        if (vkAllocateMemory(m_deviceContext.getDevice(), &allocInfo, nullptr, &texture->memory) != VK_SUCCESS) {
+        if (vkAllocateMemory(m_deviceContext_ptr->getDevice(), &allocInfo, nullptr, &texture->memory) != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate image memory!");
         }
 
         // Set Memory
-        vkBindImageMemory(m_deviceContext.getDevice(), texture->image, texture->memory, 0);
+        vkBindImageMemory(m_deviceContext_ptr->getDevice(), texture->image, texture->memory, 0);
 
         transitionImageLayout(texture->image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         copyBufferToImage(stagingBuffer, texture->image, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
@@ -80,13 +80,13 @@ namespace AetherEngine::ResourceManagment {
 
         transitionImageLayout(texture->image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-        vkDestroyBuffer(m_deviceContext.getDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(m_deviceContext.getDevice(), stagingBufferMemory, nullptr);
+        vkDestroyBuffer(m_deviceContext_ptr->getDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(m_deviceContext_ptr->getDevice(), stagingBufferMemory, nullptr);
 
         m_textureCache[filename] = std::weak_ptr<Objects::TextureResource>(texture);
 
         // Set ImageView
-        texture->imageView = m_swapchainContext.createImageView(texture->image, VK_FORMAT_R8G8B8A8_SRGB); // TODO: custom format
+        texture->imageView = m_swapchainContext_ptr->createImageView(texture->image, VK_FORMAT_R8G8B8A8_SRGB); // TODO: custom format
 
         return texture;
     }
@@ -106,7 +106,7 @@ namespace AetherEngine::ResourceManagment {
     // }
 
     void ResourceManager::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
-        VkCommandBuffer commandBuffer = m_renderer.beginSingleTimeCommands();
+        VkCommandBuffer commandBuffer = m_memoryManager_ptr->beginSingleTimeCommands();
 
         VkImageMemoryBarrier barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -151,11 +151,11 @@ namespace AetherEngine::ResourceManagment {
             1, &barrier
         );
 
-        m_renderer.endSingleTimeCommands(commandBuffer);
+        m_memoryManager_ptr->endSingleTimeCommands(commandBuffer);
     }
 
     void ResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
-        VkCommandBuffer commandBuffer = m_renderer.beginSingleTimeCommands();
+        VkCommandBuffer commandBuffer = m_memoryManager_ptr->beginSingleTimeCommands();
 
         VkBufferImageCopy region{};
         region.bufferOffset = 0;
@@ -183,119 +183,6 @@ namespace AetherEngine::ResourceManagment {
             &region
         );
 
-        m_renderer.endSingleTimeCommands(commandBuffer);
-    }
-
-    // Model management methods
-    std::shared_ptr<Rendering::Objects::Model> ResourceManager::createQuadModel() {
-        // Create quad vertices and indices
-        std::vector<Rendering::Objects::Vertex> quadVertices = {
-            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-            {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-            {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
-        };
-        std::vector<uint16_t> quadIndices = {0, 1, 2, 2, 3, 0};
-
-        // Create vertex buffer
-        VkBuffer vertexBuffer;
-        VkDeviceMemory vertexBufferMemory;
-        VkDeviceSize vertexBufferSize = sizeof(quadVertices[0]) * quadVertices.size();
-        
-        m_deviceContext.createBuffer(
-            vertexBufferSize,
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            vertexBuffer,
-            vertexBufferMemory
-        );
-
-        // Create index buffer
-        VkBuffer indexBuffer;
-        VkDeviceMemory indexBufferMemory;
-        VkDeviceSize indexBufferSize = sizeof(quadIndices[0]) * quadIndices.size();
-        
-        m_deviceContext.createBuffer(
-            indexBufferSize,
-            VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            indexBuffer,
-            indexBufferMemory
-        );
-
-        // Copy vertex data to buffer using staging buffer
-        VkBuffer vertexStagingBuffer;
-        VkDeviceMemory vertexStagingBufferMemory;
-        m_deviceContext.createBuffer(
-            vertexBufferSize,
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            vertexStagingBuffer,
-            vertexStagingBufferMemory
-        );
-
-        void* vertexData;
-        vkMapMemory(m_deviceContext.getDevice(), vertexStagingBufferMemory, 0, vertexBufferSize, 0, &vertexData);
-        memcpy(vertexData, quadVertices.data(), static_cast<size_t>(vertexBufferSize));
-        vkUnmapMemory(m_deviceContext.getDevice(), vertexStagingBufferMemory);
-
-        // Copy index data to buffer using staging buffer
-        VkBuffer indexStagingBuffer;
-        VkDeviceMemory indexStagingBufferMemory;
-        m_deviceContext.createBuffer(
-            indexBufferSize,
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            indexStagingBuffer,
-            indexStagingBufferMemory
-        );
-
-        void* indexData;
-        vkMapMemory(m_deviceContext.getDevice(), indexStagingBufferMemory, 0, indexBufferSize, 0, &indexData);
-        memcpy(indexData, quadIndices.data(), static_cast<size_t>(indexBufferSize));
-        vkUnmapMemory(m_deviceContext.getDevice(), indexStagingBufferMemory);
-
-        // Copy staging buffers to device local buffers
-        m_renderer.copyBuffer(vertexStagingBuffer, vertexBuffer, vertexBufferSize);
-        m_renderer.copyBuffer(indexStagingBuffer, indexBuffer, indexBufferSize);
-
-        // Cleanup staging buffers
-        vkDestroyBuffer(m_deviceContext.getDevice(), vertexStagingBuffer, nullptr);
-        vkFreeMemory(m_deviceContext.getDevice(), vertexStagingBufferMemory, nullptr);
-        vkDestroyBuffer(m_deviceContext.getDevice(), indexStagingBuffer, nullptr);
-        vkFreeMemory(m_deviceContext.getDevice(), indexStagingBufferMemory, nullptr);
-
-        // Create material (using default constructor for now)
-        Rendering::Objects::Material* material = new Rendering::Objects::Material();
-
-        // Create transform matrix (identity matrix)
-        glm::mat4 transform = glm::mat4(1.0f);
-
-        // Create and return the model
-        auto model = std::make_shared<Rendering::Objects::Model>(
-            vertexBuffer,
-            indexBuffer,
-            quadVertices,
-            quadIndices,
-            material,
-            transform
-        );
-
-        return model;
-    }
-
-    void ResourceManager::addModel(std::shared_ptr<Rendering::Objects::Model> model) {
-        m_models.push_back(model);
-    }
-
-    void ResourceManager::removeModel(std::shared_ptr<Rendering::Objects::Model> model) {
-        auto it = std::find(m_models.begin(), m_models.end(), model);
-        if (it != m_models.end()) {
-            m_models.erase(it);
-        }
-    }
-
-    const std::vector<std::shared_ptr<Rendering::Objects::Model>>& ResourceManager::getModels() const {
-        return m_models;
+        m_memoryManager_ptr->endSingleTimeCommands(commandBuffer);
     }
 }

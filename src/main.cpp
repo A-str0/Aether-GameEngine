@@ -4,6 +4,7 @@
 #include <rendering/vulkan/vulkan_swapchain_context.hpp>
 #include <rendering/vulkan/renderer.hpp>
 #include <resource_managment/resource_manager.hpp>
+#include <rendering/vulkan/memory_manager.hpp>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
@@ -11,6 +12,7 @@
 #include <stdexcept>
 #include <vector>
 #include <string>
+#include <memory>
 
 int main() {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -19,7 +21,9 @@ int main() {
 
     AetherEngine::WindowContext windowContext {"AetherEngine", 800, 600};
     std::vector<const char*> extensions = windowContext.getRequredExtensions();
-    AetherEngine::Rendering::VulkanContext vulkanContext {extensions};
+    // extensions.push_back("VK_KHR_multiview");
+    // extensions.push_back("VK_KHR_maintenance2.");
+    AetherEngine::Rendering::VulkanContext vulkanContext {extensions, true};
     windowContext.recreateSurface(vulkanContext);
 
     // TODO: refactor
@@ -45,35 +49,48 @@ int main() {
 
     AetherEngine::Rendering::VulkanDeviceContext deviceContext {physicalDevice, windowContext.getSurface()};
     AetherEngine::Rendering::VulkanSwapchainContext swapchainContext {deviceContext, windowContext};
-    AetherEngine::Rendering::Renderer renderer {deviceContext, swapchainContext, windowContext.getSurface()};
-    AetherEngine::ResourceManagment::ResourceManager resourceManager {deviceContext, swapchainContext, renderer};
+    AetherEngine::Rendering::MemoryManager memoryManager { &deviceContext, &swapchainContext };
+    AetherEngine::Rendering::Renderer renderer { &deviceContext, &swapchainContext, &memoryManager, windowContext.getSurface() };
+    AetherEngine::ResourceManagment::ResourceManager resourceManager { &deviceContext, &swapchainContext, &memoryManager };
 
     auto texture = resourceManager.loadTexture("../../../src/core/rendering/textures/tex.jpg");
     renderer.updateDescriptorSets(texture->imageView);
 
-    // Create a vector to hold models
-    std::vector<std::shared_ptr<AetherEngine::Rendering::Objects::Model>> models;
+    // memoryManager 
 
-    // Create quad model using ResourceManager
-    auto quadModel = resourceManager.createQuadModel();
-    models.push_back(quadModel);
+    std::vector<AetherEngine::Rendering::Objects::Mesh*> meshes{};
+    std::vector<AetherEngine::Rendering::Objects::Vertex> vertices {
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+    };
+    std::vector<uint16_t> indices {
+        0, 1, 2, 2, 3, 0
+    };
+    AetherEngine::Rendering::Objects::Mesh mesh {
+        vertices,
+        indices,
+        nullptr // Material
+    };
+    meshes.push_back(&mesh);
 
     bool running = true;
     SDL_Event event;
     while (running) {
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                running = false;
-            } 
-            // else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
-            //     recreateSwapchain();
-            // }
-        }
-        renderer.drawFrame(models);
+        // while (SDL_PollEvent(&event)) {
+        //     if (event.type == SDL_QUIT) {
+        //         running = false;
+        //     } 
+        //     // else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+        //     //     recreateSwapchain();
+        //     // }
+        // }
+        renderer.drawFrame(meshes);
     }
 
     // TODO: change?
-    texture->cleanup(deviceContext.getDevice());
+    // texture->cleanup(deviceContext.getDevice());
 
     SDL_Quit();
     return 0;

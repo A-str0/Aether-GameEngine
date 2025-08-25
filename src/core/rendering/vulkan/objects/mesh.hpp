@@ -8,24 +8,18 @@
 #include <src/core/rendering/objects/vertex.hpp>
 
 namespace AetherEngine::Rendering::Objects {
-    class Model {
+    class Mesh {
     public:
-        Model(
-            VkBuffer vertexBuffer, 
-            VkBuffer indexBuffer, 
+        Mesh(
             std::vector<Vertex> _vertices, 
             std::vector<uint16_t> _indices,
-            Material* material_ptr,
-            glm::mat4 transform
+            Material* material_ptr
         ) : 
-            m_vertexBuffer(vertexBuffer), 
-            m_indexBuffer(indexBuffer),
-            vertices(_vertices),
-            indices(_indices),
-            m_material_ptr(material_ptr),
-            m_transform(transform) { 
-        }
-        virtual ~Model() {
+            // vertices(_vertices),
+            // indices(_indices),
+            m_material_ptr(material_ptr) 
+        { }
+        virtual ~Mesh() {
             // Note: Buffer destruction should be handled by the resource manager
             delete m_material_ptr;
             m_material_ptr = nullptr;
@@ -35,15 +29,17 @@ namespace AetherEngine::Rendering::Objects {
         const std::vector<uint16_t> indices;
 
         Material* getMaterial() const { return m_material_ptr; }
-        glm::mat4 getTransform() const { return m_transform; }
-        VkBuffer getVertexBuffer() const { return m_vertexBuffer; }
-        VkBuffer getIndexBuffer() const { return m_indexBuffer; }
-
+        
+        void setVertexOffset(uint16_t offset) { vertexOffset = offset; }
+        void setIndexOffset(uint16_t offset) { indexOffset = offset; }
+        
+        uint16_t getVertexOffset() const { return vertexOffset; }
+        uint16_t getIndexOffset() const { return indexOffset; }
     private:
-        VkBuffer m_vertexBuffer;
-        VkBuffer m_indexBuffer;
         Material* m_material_ptr;
-        glm::mat4 m_transform;
+
+        uint16_t vertexOffset = 0;
+        uint16_t indexOffset = 0;
     };
 }
 

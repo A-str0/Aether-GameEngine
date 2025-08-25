@@ -9,7 +9,7 @@ namespace AetherEngine::Rendering::Objects {
     struct Vertex {
         glm::vec2 pos;
         glm::vec3 color;
-        glm::vec2 texCoord;
+        glm::vec2 uv;
 
         static VkVertexInputBindingDescription getBindingDescription() {
             VkVertexInputBindingDescription bindingDescription{};
@@ -23,23 +23,23 @@ namespace AetherEngine::Rendering::Objects {
         static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
             std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
 
-            // Create Position Attribute
+            // Create Position Attribute (vec2)
             attributeDescriptions[0].binding = 0;
             attributeDescriptions[0].location = 0;
-            attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT; // is it??
+            attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
             attributeDescriptions[0].offset = offsetof(Vertex, pos);
 
-            // Create Color Attribute
+            // Create Color Attribute (vec3)
             attributeDescriptions[1].binding = 0;
             attributeDescriptions[1].location = 1;
             attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
             attributeDescriptions[1].offset = offsetof(Vertex, color);
 
-            // Create TexCoord Attribute
+            // Create UV Attribute (vec2)
             attributeDescriptions[2].binding = 0;
             attributeDescriptions[2].location = 2;
             attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-            attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+            attributeDescriptions[2].offset = offsetof(Vertex, uv);
 
             return attributeDescriptions;
         }
