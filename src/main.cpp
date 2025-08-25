@@ -1,9 +1,9 @@
-#include "core/window_managment/window_context.h"
-#include "core/rendering/vulkan/vulkan_context.h"
-#include "core/rendering/vulkan/vulkan_device_context.h"
-#include "core/rendering/vulkan/vulkan_swapchain_context.h"
-#include "core/rendering/vulkan/renderer.h"
-#include "core/resource_managment/resource_manager.h"
+#include <window_managment/window_context.hpp>
+#include <rendering/vulkan/vulkan_context.hpp>
+#include <rendering/vulkan/vulkan_device_context.hpp>
+#include <rendering/vulkan/vulkan_swapchain_context.hpp>
+#include <rendering/vulkan/renderer.hpp>
+#include <resource_managment/resource_manager.hpp>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>

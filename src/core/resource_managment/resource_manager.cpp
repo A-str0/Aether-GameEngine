@@ -4,7 +4,7 @@
 #include <stb/stb_image.h>
 
 #include <fstream>
-#include "resource_manager.h"
+#include "resource_manager.hpp"
 
 namespace AetherEngine::ResourceManagment {
     std::shared_ptr<Objects::TextureResource> ResourceManager::loadTexture(std::string filename) {

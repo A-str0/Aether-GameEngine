@@ -1,5 +1,5 @@
 #include <iostream>
-#include "vulkan_context.h"
+#include "vulkan_context.hpp"
 
 namespace AetherEngine::Rendering {
     VulkanContext::VulkanContext(std::vector<const char*> extensions, bool enableValidationLayers) : m_enableValidationLayers(enableValidationLayers) {

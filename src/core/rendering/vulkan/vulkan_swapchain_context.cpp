@@ -1,5 +1,5 @@
-#include "vulkan_swapchain_context.h"
-#include "vulkan_device_context.h"
+#include "vulkan_swapchain_context.hpp"
+#include "vulkan_device_context.hpp"
 #include <stdexcept>
 #include <algorithm>
 #include <iostream>

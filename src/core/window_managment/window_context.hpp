@@ -1,5 +1,5 @@
 #include <SDL2/SDL.h>
-#include "../rendering/vulkan/vulkan_context.h"
+#include <rendering/vulkan/vulkan_context.hpp>
 #include <SDL2/SDL_vulkan.h>
 #include <vulkan/vulkan.hpp>
 

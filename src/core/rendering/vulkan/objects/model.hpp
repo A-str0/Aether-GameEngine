@@ -5,7 +5,7 @@
 #include <glm/glm.hpp>
 
 #include "material.hpp"
-#include <src/core/rendering/objects/vertex.h>
+#include <src/core/rendering/objects/vertex.hpp>
 
 namespace AetherEngine::Rendering::Objects {
     class Model {

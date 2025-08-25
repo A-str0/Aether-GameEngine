@@ -4,7 +4,7 @@
 #include <vulkan/vulkan.hpp>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
-#include "structs.h"
+#include "queue_family_indices.hpp"
 
 namespace AetherEngine::Rendering {
     class VulkanDeviceContext {

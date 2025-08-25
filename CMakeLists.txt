@@ -19,8 +19,9 @@ add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
 # Set include directories
 target_include_directories(${PROJECT_NAME} PRIVATE 
-    "thirdparty"
     ""
+    "thirdparty"
+    "src/core"
 )
 
 # Link Vulkan

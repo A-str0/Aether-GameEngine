@@ -1,6 +1,6 @@
 #define GLM_FORCE_RADIANS
 
-#include "renderer.h"
+#include "renderer.hpp"
 
 #include <stdexcept>
 #include <array>
@@ -12,9 +12,9 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "../objects/vertex.h" // TODO: change
-#include "../../resource_managment/objects/texture_resource.h" // TODO: change
-#include <src/core/rendering/vulkan/objects/model.hpp>
+#include <rendering/objects/vertex.hpp>
+#include <resource_managment/objects/texture_resource.hpp>
+#include <rendering/vulkan/objects/model.hpp>
 
 #define MAX_FRAMES_IN_FLIGHT 2
 

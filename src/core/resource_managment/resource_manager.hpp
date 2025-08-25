@@ -6,11 +6,10 @@
 #include <memory>
 #include <vulkan/vulkan.hpp>
 
-#include "objects/texture_resource.h" // TODO: change
-#include "objects/ae_object.h" // TODO: change
-#include "../rendering/vulkan/vulkan_device_context.h" // TODO: change
-#include "../rendering/vulkan/renderer.h" // TODO: change
-#include "../rendering/vulkan/objects/model.hpp" // TODO: change
+#include <resource_managment/objects/texture_resource.hpp>
+#include <rendering/vulkan/vulkan_device_context.hpp>
+#include <rendering/vulkan/renderer.hpp>
+#include <rendering/vulkan/objects/model.hpp>
 
 namespace AetherEngine::ResourceManagment {
     class ResourceManager {
@@ -29,10 +28,6 @@ namespace AetherEngine::ResourceManagment {
         std::shared_ptr<Objects::TextureResource> loadTexture(std::string filename);
         void unloadTexture(u_char* pixels);
 
-        // TODO: move onto the ECS
-        std::shared_ptr<Objects::AE_Object> craeteObject(std::string name);
-        void deleteObject(std::string name);
-
         // Model management
         std::shared_ptr<Rendering::Objects::Model> createQuadModel();
         void addModel(std::shared_ptr<Rendering::Objects::Model> model);
@@ -44,7 +39,6 @@ namespace AetherEngine::ResourceManagment {
         Rendering::Renderer& m_renderer;
 
         std::unordered_map<std::string, std::weak_ptr<Objects::TextureResource>> m_textureCache;
-        std::unordered_map<std::string, std::weak_ptr<Objects::AE_Object>> m_objectsCache;
         std::vector<std::shared_ptr<Rendering::Objects::Model>> m_models;
 
         void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);

@@ -1,14 +1,15 @@
 #ifndef AETHERENGINE_RENDERING_RENDERER_H
 #define AETHERENGINE_RENDERING_RENDERER_H
 
-#include "vulkan_device_context.h"
-#include "vulkan_swapchain_context.h"
+#include "vulkan_device_context.hpp"
+#include "vulkan_swapchain_context.hpp"
 #include <vulkan/vulkan.hpp>
 #include <vector>
 #include <memory>
 
-#include "../objects/vertex.h" // TODO: change
-#include "objects/model.hpp" // TODO: change
+#include <rendering/objects/vertex.hpp>
+#include <rendering/vulkan/objects/model.hpp>
+#include "uniform_buffer_object.hpp"
 
 namespace AetherEngine::Rendering {
     class Renderer {
