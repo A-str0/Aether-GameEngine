@@ -125,7 +125,7 @@ namespace AetherEngine::Rendering {
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(m_deviceContext_ptr->getDevice(), m_swapchainContext_ptr->getSwapchain(), UINT64_MAX, m_imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-            // m_swapchainContext_ptr->recreateSwapchain();
+            m_swapchainContext_ptr->recreateSwapchain();
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             throw std::runtime_error("Failed to acquire swapchain image!");
         }

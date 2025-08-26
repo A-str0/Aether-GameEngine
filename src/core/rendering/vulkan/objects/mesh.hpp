@@ -15,8 +15,8 @@ namespace AetherEngine::Rendering::Objects {
             std::vector<uint16_t> _indices,
             Material* material_ptr
         ) : 
-            // vertices(_vertices),
-            // indices(_indices),
+            vertices(_vertices),
+            indices(_indices),
             m_material_ptr(material_ptr) 
         { }
         virtual ~Mesh() {

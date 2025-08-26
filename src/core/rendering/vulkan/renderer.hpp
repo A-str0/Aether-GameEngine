@@ -62,8 +62,8 @@ namespace AetherEngine::Rendering {
         // TODO: maybe not vectors???
         std::vector<VkFramebuffer> m_frameBuffers;
 
-        std::vector<VkSemaphore> m_imageAvailableSemaphores;
-        std::vector<VkSemaphore> m_renderFinishedSemaphores;
+        std::vector<VkSemaphore> m_imageAvailableSemaphores; // One for each swapchain image
+        std::vector<VkSemaphore> m_renderFinishedSemaphores; // One for each swapchain image
         std::vector<VkFence> m_inFlightFences;
     };
 }

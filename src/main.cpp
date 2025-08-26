@@ -53,11 +53,6 @@ int main() {
     AetherEngine::Rendering::Renderer renderer { &deviceContext, &swapchainContext, &memoryManager, windowContext.getSurface() };
     AetherEngine::ResourceManagment::ResourceManager resourceManager { &deviceContext, &swapchainContext, &memoryManager };
 
-    auto texture = resourceManager.loadTexture("../../../src/core/rendering/textures/tex.jpg");
-    renderer.updateDescriptorSets(texture->imageView);
-
-    // memoryManager 
-
     std::vector<AetherEngine::Rendering::Objects::Mesh*> meshes{};
     std::vector<AetherEngine::Rendering::Objects::Vertex> vertices {
         {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
@@ -74,6 +69,12 @@ int main() {
         nullptr // Material
     };
     meshes.push_back(&mesh);
+
+    auto texture = resourceManager.loadTexture("../../../src/core/rendering/textures/tex.jpg");
+    // auto texture = resourceManager.loadTexture("src/core/rendering/textures/tex.jpg");
+    renderer.updateDescriptorSets(texture->imageView);
+
+    memoryManager.uploadMesh(mesh);
 
     bool running = true;
     SDL_Event event;

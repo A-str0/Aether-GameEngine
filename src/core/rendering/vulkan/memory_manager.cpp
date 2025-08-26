@@ -1,6 +1,7 @@
 #include "memory_manager.hpp"
 
 #include <chrono>
+#include <cstring>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <rendering/objects/vertex.hpp>
@@ -37,6 +38,13 @@ namespace AetherEngine::Rendering {
     }
 
     void MemoryManager::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+        // if (buffer != VK_NULL_HANDLE) {
+        //     vkDestroyBuffer(m_deviceContext_ptr->getDevice(), buffer, nullptr);
+        // }
+        // if (bufferMemory != VK_NULL_HANDLE) {
+        //     vkFreeMemory(m_deviceContext_ptr->getDevice(), bufferMemory, nullptr);
+        // }
+
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.flags = 0; // TODO
@@ -50,8 +58,9 @@ namespace AetherEngine::Rendering {
         bufferInfo.queueFamilyIndexCount = 0;
         bufferInfo.pQueueFamilyIndices = nullptr;
 
-        if (vkCreateBuffer(m_deviceContext_ptr->getDevice(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create buffer!");
+        VkResult result = vkCreateBuffer(m_deviceContext_ptr->getDevice(), &bufferInfo, nullptr, &buffer);
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create buffer! Error code: " + std::to_string(result));
         }
 
         VkMemoryRequirements memoryRequirements;
@@ -62,88 +71,41 @@ namespace AetherEngine::Rendering {
         allocInfo.allocationSize = memoryRequirements.size;
         allocInfo.memoryTypeIndex = m_deviceContext_ptr->getMemoryType(memoryRequirements.memoryTypeBits, properties);
 
-        if (vkAllocateMemory(m_deviceContext_ptr->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to allocate buffer memory!");
+        result = vkAllocateMemory(m_deviceContext_ptr->getDevice(), &allocInfo, nullptr, &bufferMemory);
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate buffer memory! Error code: " + std::to_string(result));
         }
 
-        vkBindBufferMemory(m_deviceContext_ptr->getDevice(), buffer, bufferMemory, 0);
+        result = vkBindBufferMemory(m_deviceContext_ptr->getDevice(), buffer, bufferMemory, 0);
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to bind buffer memory! Error code: " + std::to_string(result));
+        }
     }
 
     void MemoryManager::createVertexBuffer() {
         // Create vertex buffer
-        VkBuffer vertexBuffer;
-        VkDeviceMemory vertexBufferMemory;
-        VkDeviceSize vertexBufferSize = sizeof(Rendering::Objects::Vertex) * 4;
+        VkDeviceSize vertexBufferSize = sizeof(Rendering::Objects::Vertex) * 4; // Default size for 4 vertices
         
         createBuffer(
             vertexBufferSize,
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            vertexBuffer,
-            vertexBufferMemory
+            m_vertexBuffer,
+            m_vertexBufferMemory
         );
-        
-        // Copy vertex data to buffer using staging buffer
-        // VkBuffer vertexStagingBuffer;
-        // VkDeviceMemory vertexStagingBufferMemory;
-        // createBuffer(
-        //     vertexBufferSize,
-        //     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        //     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        //     vertexStagingBuffer,
-        //     vertexStagingBufferMemory
-        // );
-
-        // void* vertexData;
-        // vkMapMemory(m_deviceContext_ptr->getDevice(), vertexStagingBufferMemory, 0, vertexBufferSize, 0, &vertexData);
-        // memcpy(vertexData, quadVertices.data(), static_cast<size_t>(vertexBufferSize));
-        // vkUnmapMemory(m_deviceContext_ptr->getDevice(), vertexStagingBufferMemory);
-
-        // Copy staging buffers to device local buffers
-        // copyBuffer(vertexStagingBuffer, vertexBuffer, vertexBufferSize);
-
-        // Cleanup staging buffers
-        // vkDestroyBuffer(m_deviceContext_ptr->getDevice(), vertexStagingBuffer, nullptr);
-        // vkFreeMemory(m_deviceContext_ptr->getDevice(), vertexStagingBufferMemory, nullptr);
     }
 
     void MemoryManager::createIndexBuffer() {
         // Create index buffer
-        VkBuffer indexBuffer;
-        VkDeviceMemory indexBufferMemory;
-        VkDeviceSize indexBufferSize = sizeof(uint16_t) * 6;
+        VkDeviceSize indexBufferSize = sizeof(uint16_t) * 6; // Default size for 6 indices
         
         createBuffer(
             indexBufferSize,
             VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            indexBuffer,
-            indexBufferMemory
+            m_indexBuffer,
+            m_indexBufferMemory
         );
-
-        // Copy index data to buffer using staging buffer
-        // VkBuffer indexStagingBuffer;
-        // VkDeviceMemory indexStagingBufferMemory;
-        // createBuffer(
-        //     indexBufferSize,
-        //     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        //     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        //     indexStagingBuffer,
-        //     indexStagingBufferMemory
-        // );
-
-        // void* indexData;
-        // vkMapMemory(m_deviceContext_ptr->getDevice(), indexStagingBufferMemory, 0, indexBufferSize, 0, &indexData);
-        // memcpy(indexData, quadIndices.data(), static_cast<size_t>(indexBufferSize));
-        // vkUnmapMemory(m_deviceContext_ptr->getDevice(), indexStagingBufferMemory);
-
-        // Copy staging buffers to device local buffers
-        // copyBuffer(indexStagingBuffer, indexBuffer, indexBufferSize);
-
-        // Cleanup staging buffers
-        // vkDestroyBuffer(m_deviceContext_ptr->getDevice(), indexStagingBuffer, nullptr);
-        // vkFreeMemory(m_deviceContext_ptr->getDevice(), indexStagingBufferMemory, nullptr);
-
     }
 
     void MemoryManager::createUniformBuffer() {
@@ -300,6 +262,126 @@ namespace AetherEngine::Rendering {
         if (vkAllocateDescriptorSets(m_deviceContext_ptr->getDevice(), &allocInfo, m_descriptorSets.data()) != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate descriptor sets!");
         }
+    }
+
+    void MemoryManager::uploadMesh(const AetherEngine::Rendering::Objects::Mesh& mesh) {
+        // Check if we need to recreate vertex buffer (if current buffer is too small or doesn't exist)
+        VkDeviceSize requiredVertexBufferSize = sizeof(Rendering::Objects::Vertex) * mesh.vertices.size();
+        
+        if (m_vertexBuffer == VK_NULL_HANDLE) {
+            // Create new buffer with proper size
+            createBuffer(
+                requiredVertexBufferSize,
+                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                m_vertexBuffer,
+                m_vertexBufferMemory
+            );
+        } else {
+            // Check if existing buffer is too small
+            VkMemoryRequirements memRequirements;
+            vkGetBufferMemoryRequirements(m_deviceContext_ptr->getDevice(), m_vertexBuffer, &memRequirements);
+            
+            if (memRequirements.size < requiredVertexBufferSize) {
+                // Destroy old buffer and create new one with proper size
+                vkDestroyBuffer(m_deviceContext_ptr->getDevice(), m_vertexBuffer, nullptr);
+                vkFreeMemory(m_deviceContext_ptr->getDevice(), m_vertexBufferMemory, nullptr);
+                
+                createBuffer(
+                    requiredVertexBufferSize,
+                    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    m_vertexBuffer,
+                    m_vertexBufferMemory
+                );
+            }
+        }
+
+        // Check if we need to recreate index buffer (if current buffer is too small or doesn't exist)
+        VkDeviceSize requiredIndexBufferSize = sizeof(uint16_t) * mesh.indices.size();
+        
+        if (m_indexBuffer == VK_NULL_HANDLE) {
+            // Create new buffer with proper size
+            createBuffer(
+                requiredIndexBufferSize,
+                VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                m_indexBuffer,
+                m_indexBufferMemory
+            );
+        } else {
+            // Check if existing buffer is too small
+            VkMemoryRequirements memRequirements;
+            vkGetBufferMemoryRequirements(m_deviceContext_ptr->getDevice(), m_indexBuffer, &memRequirements);
+            
+            if (memRequirements.size < requiredIndexBufferSize) {
+                // Destroy old buffer and create new one with proper size
+                vkDestroyBuffer(m_deviceContext_ptr->getDevice(), m_indexBuffer, nullptr);
+                vkFreeMemory(m_deviceContext_ptr->getDevice(), m_indexBufferMemory, nullptr);
+                
+                createBuffer(
+                    requiredIndexBufferSize,
+                    VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    m_indexBuffer,
+                    m_indexBufferMemory
+                );
+            }
+        }
+
+        // Copy vertex data to vertex buffer
+        VkDeviceSize vertexBufferSize = sizeof(Rendering::Objects::Vertex) * mesh.vertices.size();
+        
+        // Create staging buffer for vertices
+        VkBuffer vertexStagingBuffer;
+        VkDeviceMemory vertexStagingBufferMemory;
+        createBuffer(
+            vertexBufferSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            vertexStagingBuffer,
+            vertexStagingBufferMemory
+        );
+
+        // Map memory and copy vertex data
+        void* vertexData;
+        vkMapMemory(m_deviceContext_ptr->getDevice(), vertexStagingBufferMemory, 0, vertexBufferSize, 0, &vertexData);
+        memcpy(vertexData, mesh.vertices.data(), static_cast<size_t>(vertexBufferSize));
+        vkUnmapMemory(m_deviceContext_ptr->getDevice(), vertexStagingBufferMemory);
+
+        // Copy staging buffer to device local vertex buffer
+        copyBuffer(vertexStagingBuffer, m_vertexBuffer, vertexBufferSize);
+
+        // Cleanup staging buffer
+        vkDestroyBuffer(m_deviceContext_ptr->getDevice(), vertexStagingBuffer, nullptr);
+        vkFreeMemory(m_deviceContext_ptr->getDevice(), vertexStagingBufferMemory, nullptr);
+
+        // Copy index data to index buffer
+        VkDeviceSize indexBufferSize = sizeof(uint16_t) * mesh.indices.size();
+        
+        // Create staging buffer for indices
+        VkBuffer indexStagingBuffer;
+        VkDeviceMemory indexStagingBufferMemory;
+        createBuffer(
+            indexBufferSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            indexStagingBuffer,
+            indexStagingBufferMemory
+        );
+
+        // Map memory and copy index data
+        void* indexData;
+        vkMapMemory(m_deviceContext_ptr->getDevice(), indexStagingBufferMemory, 0, indexBufferSize, 0, &indexData);
+        memcpy(indexData, mesh.indices.data(), static_cast<size_t>(indexBufferSize));
+        vkUnmapMemory(m_deviceContext_ptr->getDevice(), indexStagingBufferMemory);
+
+        // Copy staging buffer to device local index buffer
+        copyBuffer(indexStagingBuffer, m_indexBuffer, indexBufferSize);
+
+        // Cleanup staging buffer
+        vkDestroyBuffer(m_deviceContext_ptr->getDevice(), indexStagingBuffer, nullptr);
+        vkFreeMemory(m_deviceContext_ptr->getDevice(), indexStagingBufferMemory, nullptr);
     }
 
     void MemoryManager::updateUniformBuffer(uint32_t currentImage) {
