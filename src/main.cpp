@@ -4,6 +4,12 @@
 #include "core/rendering/vulkan/vulkan_swapchain_context.h"
 #include "core/rendering/vulkan/renderer.h"
 #include "core/resource_managment/resource_manager.h"
+#include "core/rendering/vulkan/material.hpp"
+#include "core/rendering/objects/vertex.h"
+#include "core/rendering/vulkan/mesh_component.hpp"
+#include "core/rendering/vulkan/material.hpp"
+#include "core/rendering/vulkan/vulkan_buffer_manager.hpp"
+#include "core/rendering/vulkan/vulkan_command_manager.hpp"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
@@ -43,13 +49,34 @@ int main() {
         }
     }
 
-    AetherEngine::Rendering::VulkanDeviceContext deviceContext {physicalDevice, windowContext.getSurface()};
-    AetherEngine::Rendering::VulkanSwapchainContext swapchainContext {deviceContext, windowContext};
-    AetherEngine::Rendering::Renderer renderer {deviceContext, swapchainContext, windowContext.getSurface()};
-    AetherEngine::ResourceManagment::ResourceManager resourceManager {deviceContext, swapchainContext, renderer};
+    auto deviceContext_ptr = std::make_shared<AetherEngine::Rendering::VulkanDeviceContext>(physicalDevice, windowContext.getSurface());
+    auto swapchainContext_ptr = std::make_shared<AetherEngine::Rendering::VulkanSwapchainContext>(*deviceContext_ptr.get(), windowContext);
+    auto commandManager_ptr = std::make_shared<AetherEngine::Rendering::VulkanCommandManager>(deviceContext_ptr, swapchainContext_ptr);
+    auto bufferManager_ptr = std::make_shared<AetherEngine::Rendering::VulkanBufferManager>(deviceContext_ptr, commandManager_ptr);
+
+    AetherEngine::Rendering::Renderer renderer {*deviceContext_ptr.get(), *swapchainContext_ptr.get(), bufferManager_ptr, commandManager_ptr};
+    AetherEngine::ResourceManagment::ResourceManager resourceManager {*deviceContext_ptr.get(), *swapchainContext_ptr.get(), bufferManager_ptr, commandManager_ptr};
 
     auto texture = resourceManager.loadTexture("../../../src/core/rendering/textures/tex.jpg");
-    renderer.updateDescriptorSets(texture->imageView);
+    auto material = std::make_shared<AetherEngine::Rendering::Material>(std::make_shared<VkDevice>(deviceContext_ptr->getDevice()), nullptr, texture);
+
+    const std::vector<AetherEngine::Rendering::Objects::Vertex> vertices = {
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+    };
+    const std::vector<uint16_t> indices = {
+        0, 1, 2, 2, 3, 0
+    };
+    auto mesh = AetherEngine::Rendering::MeshComponent {vertices, indices, 0, 0, material};
+
+    std::vector<AetherEngine::Rendering::MeshComponent> meshes;
+    meshes.push_back(mesh);
+
+    // AetherEngine::Rendering::Material material{texture, renderer.};
+    
+    // renderer.updateDescriptorSets(texture->imageView);
 
     bool running = true;
     SDL_Event event;
@@ -62,11 +89,11 @@ int main() {
             //     recreateSwapchain();
             // }
         }
-        renderer.drawFrame();
+        renderer.drawFrame(meshes);
     }
 
     // TODO: change?
-    texture->cleanup(deviceContext.getDevice());
+    // texture->cleanup(deviceContext.getDevice());
 
     SDL_Quit();
     return 0;

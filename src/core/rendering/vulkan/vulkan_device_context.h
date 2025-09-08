@@ -1,10 +1,14 @@
 #ifndef AETHERENGINE_RENDERING_DEVICECONTEXT_H
 #define AETHERENGINE_RENDERING_DEVICECONTEXT_H
 
+#include <memory>
+
 #include <vulkan/vulkan.hpp>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
-#include "structs.h"
+
+#include "queue_family_indices.h"
+#include "buffer_context.hpp"
 
 namespace AetherEngine::Rendering {
     class VulkanDeviceContext {
@@ -29,8 +33,6 @@ namespace AetherEngine::Rendering {
         QueueFamilyIndices getQueueFamilyIndicies() const { return m_indices; }
 
         u_int32_t getMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-
-        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
     private:
         QueueFamilyIndices findQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface);
 
