@@ -10,6 +10,7 @@ set(SOURCE_FILES
     "src/core/window_managment/window_context.cpp"
     "src/core/rendering/vulkan/vulkan_context.cpp"
     "src/core/rendering/vulkan/vulkan_device_context.cpp"
+    "src/core/rendering/vulkan/vulkan_surface_context.cpp"
     "src/core/rendering/vulkan/vulkan_swapchain_context.cpp"
     "src/core/rendering/vulkan/vulkan_command_manager.cpp"
     "src/core/rendering/vulkan/vulkan_buffer_manager.cpp"
@@ -23,6 +24,9 @@ add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
 # Set include directories
 target_include_directories(${PROJECT_NAME} PRIVATE "thirdparty" "src")
+
+# Asset root for shaders/textures
+target_compile_definitions(${PROJECT_NAME} PRIVATE AETHER_ENGINE_ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/src/core/rendering")
 
 # Link Vulkan
 find_package(Vulkan REQUIRED)

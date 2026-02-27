@@ -1,14 +1,18 @@
 #include "vulkan_command_manager.hpp"
+#include <stdexcept>
 
 namespace AetherEngine::Rendering {
     VulkanCommandManager::VulkanCommandManager(
-        std::shared_ptr<VulkanDeviceContext> deviceContext_ptr, 
+        std::shared_ptr<VulkanDeviceContext> deviceContext_ptr,
         std::shared_ptr<VulkanSwapchainContext> swapchainContext_ptr
     ) :
         m_deviceContext_ptr(deviceContext_ptr),
         m_swapchainContext_ptr(swapchainContext_ptr)
     {
-
+        createTransferCommandPool();
+        createCommandPool();
+        createCommandBuffers();
+        createSyncObjects();
     }
 
     VulkanCommandManager::~VulkanCommandManager() {
@@ -24,7 +28,12 @@ namespace AetherEngine::Rendering {
             vkDestroyFence(device, fence, nullptr);
         }
 
-        vkDestroyCommandPool(device, m_commandPool, nullptr);
+        if (m_commandPool != VK_NULL_HANDLE) {
+            vkDestroyCommandPool(device, m_commandPool, nullptr);
+        }
+        if (m_transferCommandPool != VK_NULL_HANDLE) {
+            vkDestroyCommandPool(device, m_transferCommandPool, nullptr);
+        }
     }
 
     void VulkanCommandManager::createTransferCommandPool() {
@@ -54,6 +63,14 @@ namespace AetherEngine::Rendering {
     void VulkanCommandManager::createCommandBuffers() {
         // Allocate Command Buffer
         auto imageCount = m_swapchainContext_ptr->getImageViews().size();
+        if (!m_commandBuffers.empty()) {
+            vkFreeCommandBuffers(
+                m_deviceContext_ptr->getDevice(),
+                m_commandPool,
+                static_cast<uint32_t>(m_commandBuffers.size()),
+                m_commandBuffers.data()
+            );
+        }
         m_commandBuffers.resize(imageCount);
 
         VkCommandBufferAllocateInfo allocInfo{};
@@ -71,24 +88,30 @@ namespace AetherEngine::Rendering {
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandPool = m_commandPool;
+        allocInfo.commandPool = m_transferCommandPool;
         allocInfo.commandBufferCount = 1;
 
         VkCommandBuffer commandBuffer;
         // TODO: make cooler memory allocation (don't call vkAllocateCommandBuffers for every buffer)
-        vkAllocateCommandBuffers(m_deviceContext_ptr->getDevice(), &allocInfo, &commandBuffer);
+        if (vkAllocateCommandBuffers(m_deviceContext_ptr->getDevice(), &allocInfo, &commandBuffer) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate single-time command buffer!");
+        }
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-        vkBeginCommandBuffer(commandBuffer, &beginInfo);
+        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to begin single-time command buffer!");
+        }
 
         return commandBuffer;
     }
 
     void VulkanCommandManager::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
-        vkEndCommandBuffer(commandBuffer);
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to end single-time command buffer!");
+        }
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -97,10 +120,9 @@ namespace AetherEngine::Rendering {
 
         // TODO: change Queue to submit
         vkQueueSubmit(m_deviceContext_ptr->getTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-        // TODO: fence usage
-        vkQueueWaitIdle(m_deviceContext_ptr->getGraphicsQueue());
+        vkQueueWaitIdle(m_deviceContext_ptr->getTransferQueue());
 
-        vkFreeCommandBuffers(m_deviceContext_ptr->getDevice(), m_commandPool, 1, &commandBuffer);
+        vkFreeCommandBuffers(m_deviceContext_ptr->getDevice(), m_transferCommandPool, 1, &commandBuffer);
     }
 
     void VulkanCommandManager::createSyncObjects() {
@@ -122,5 +144,9 @@ namespace AetherEngine::Rendering {
                 throw std::runtime_error("Failed to create synchronization objects!");
             }
         }
+    }
+
+    void VulkanCommandManager::recreateCommandBuffers() {
+        createCommandBuffers();
     }
 }

@@ -4,25 +4,39 @@
 #include <vulkan/vulkan.hpp>
 
 namespace AetherEngine::ResourceManagment::Objects {
-    struct TextureResource
-    {
-        std::shared_ptr<VkDevice> device_ptr;
+    struct TextureResource {
+        VkDevice device = VK_NULL_HANDLE;
+        VkImage image = VK_NULL_HANDLE;
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+        VkImageView imageView = VK_NULL_HANDLE;
+        VkSampler sampler = VK_NULL_HANDLE;
 
-        // TODO: change to pointers
-        VkImage image;
-        VkDeviceMemory memory;
-        VkImageView imageView;
-        VkSampler sampler;
+        ~TextureResource() {
+            cleanup();
+        }
 
-        // TODO: change?
         void cleanup() {
-            vkDestroyImageView(*device_ptr, imageView, nullptr);
-            vkDestroyImage(*device_ptr, image, nullptr);
-            vkFreeMemory(*device_ptr, memory, nullptr);
-            vkDestroySampler(*device_ptr, sampler, nullptr);
+            if (device == VK_NULL_HANDLE) {
+                return;
+            }
+            if (imageView != VK_NULL_HANDLE) {
+                vkDestroyImageView(device, imageView, nullptr);
+                imageView = VK_NULL_HANDLE;
+            }
+            if (image != VK_NULL_HANDLE) {
+                vkDestroyImage(device, image, nullptr);
+                image = VK_NULL_HANDLE;
+            }
+            if (memory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, memory, nullptr);
+                memory = VK_NULL_HANDLE;
+            }
+            if (sampler != VK_NULL_HANDLE) {
+                vkDestroySampler(device, sampler, nullptr);
+                sampler = VK_NULL_HANDLE;
+            }
         }
     };
-    
 }
 
 #endif

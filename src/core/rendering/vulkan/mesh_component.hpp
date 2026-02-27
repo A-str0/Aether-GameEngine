@@ -10,21 +10,24 @@
 #include <core/rendering/objects/vertex.h>
 
 namespace AetherEngine::Rendering {
+	struct MeshData {
+		std::vector<AetherEngine::Rendering::Objects::Vertex> vertices;
+		std::vector<uint32_t> indices;
+	};
+
 	class MeshComponent {
 	public:
-		MeshComponent(const std::vector<AetherEngine::Rendering::Objects::Vertex> vertices, 
-			const std::vector<uint16_t> indices, 
-			uint32_t vertexOffset, 
-			uint32_t indexOffset,
+		MeshComponent(
+			VkDeviceSize vertexOffset, 
+			VkDeviceSize indexOffset,
+			uint32_t indexCount,
 			std::shared_ptr<Material> material
 		);
 		~MeshComponent();
 
-		std::vector<AetherEngine::Rendering::Objects::Vertex> getVertices() const { return m_vertices; }
-		std::vector<uint16_t> getIndices() const { return m_indices; }
-		
-		uint32_t getVertexOffset() const { return m_vertexOffset; }
-		uint32_t getIndexOffset() const { return m_indexOffset; }
+		VkDeviceSize getVertexOffset() const { return m_vertexOffset; }
+		VkDeviceSize getIndexOffset() const { return m_indexOffset; }
+		uint32_t getIndexCount() const { return m_indexCount; }
 
 		std::shared_ptr<Material> getMaterialPtr() const { return m_material_ptr; }
 
@@ -32,11 +35,9 @@ namespace AetherEngine::Rendering {
 	private:
 		std::shared_ptr<Material> m_material_ptr;
 
-		const std::vector<AetherEngine::Rendering::Objects::Vertex> m_vertices;
-		const std::vector<uint16_t> m_indices;
-
-		uint32_t m_vertexOffset;
-		uint32_t m_indexOffset;
+		VkDeviceSize m_vertexOffset = 0;
+		VkDeviceSize m_indexOffset = 0;
+		uint32_t m_indexCount = 0;
 	};
 }
 

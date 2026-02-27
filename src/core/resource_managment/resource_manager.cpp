@@ -4,20 +4,29 @@
 #include <stb/stb_image.h>
 
 #include <fstream>
+#include <cstring>
+#include <filesystem>
 #include "resource_manager.h"
 
 namespace AetherEngine::ResourceManagment {
     std::shared_ptr<Objects::TextureResource> ResourceManager::loadTexture(std::string filename) {
+        std::string cacheKey = std::filesystem::absolute(filename).string();
+        if (auto cached = m_textureCache.find(cacheKey); cached != m_textureCache.end()) {
+            if (auto existing = cached->second.lock()) {
+                return existing;
+            }
+        }
+
         int width, height, channels;
-        // stbi_uc* pixels = stbi_load("../../../src/core/rendering/textures/tex.jpg", &width, &height, &channels, STBI_rgb_alpha);
         stbi_uc* pixels = stbi_load(filename.data(), &width, &height, &channels, STBI_rgb_alpha);
-        VkDeviceSize imageSize = width * height * 4; // is it??
+        VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height) * 4;
 
         if (!pixels) {
             throw std::runtime_error("Failed to load texture image!");
         }
 
         auto texture = std::make_shared<Objects::TextureResource>();
+        texture->device = m_deviceContext.getDevice();
         
         auto buffer = m_bufferManager_ptr->createBuffer(
             imageSize,
@@ -81,18 +90,13 @@ namespace AetherEngine::ResourceManagment {
         copyBufferToImage(buffer->buffer, texture->image, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
         transitionImageLayout(texture->image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-        vkDestroyBuffer(m_deviceContext.getDevice(), buffer->buffer, nullptr);
-        vkFreeMemory(m_deviceContext.getDevice(), buffer->memory, nullptr);
-        buffer->buffer = VK_NULL_HANDLE;
-        buffer->memory = VK_NULL_HANDLE;
-
-        m_textureCache[filename] = std::weak_ptr<Objects::TextureResource>(texture);
+        m_textureCache[cacheKey] = std::weak_ptr<Objects::TextureResource>(texture);
 
         // Set ImageView
         texture->imageView = m_swapchainContext.createImageView(texture->image, VK_FORMAT_R8G8B8A8_SRGB); // TODO: custom format
 
         // Create Sampler
-        texture->sampler = *createSampler().get();
+        texture->sampler = createSampler();
 
         return texture;
     }
@@ -106,7 +110,7 @@ namespace AetherEngine::ResourceManagment {
     }
 
     // shared_ptr is it??
-    std::shared_ptr<VkSampler> ResourceManager::createSampler() {
+    VkSampler ResourceManager::createSampler() {
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
@@ -128,11 +132,11 @@ namespace AetherEngine::ResourceManagment {
         samplerInfo.minLod = 0.0f;
         samplerInfo.maxLod = 0.0f;
 
-        auto sampler_ptr = std::make_shared<VkSampler>();
-        if (vkCreateSampler(m_deviceContext.getDevice(), &samplerInfo, nullptr, sampler_ptr.get()) != VK_SUCCESS) {
+        VkSampler sampler = VK_NULL_HANDLE;
+        if (vkCreateSampler(m_deviceContext.getDevice(), &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create texture sampler!");
         }
-        return sampler_ptr;
+        return sampler;
     }
 
     void ResourceManager::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {

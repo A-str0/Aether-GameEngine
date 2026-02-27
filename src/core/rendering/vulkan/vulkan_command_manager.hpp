@@ -24,14 +24,15 @@ namespace AetherEngine::Rendering {
 
         VkCommandBuffer beginSingleTimeCommands();
         void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+        void recreateCommandBuffers();
 
         VkCommandPool getCommandPool() { return m_commandPool; }
         VkCommandPool getTransferCommandPool() { return m_transferCommandPool; }
-        std::vector<VkCommandBuffer> getCommandBuffers() { return m_commandBuffers; }
+        const std::vector<VkCommandBuffer>& getCommandBuffers() const { return m_commandBuffers; }
 
-        std::vector<VkSemaphore> getImageAvailableSemaphores() { return m_imageAvailableSemaphores; }
-        std::vector<VkSemaphore> getRenderFinishedSemaphores() { return m_renderFinishedSemaphores; }
-        std::vector<VkFence> getInFlightFences() { return m_inFlightFences; }
+        const std::vector<VkSemaphore>& getImageAvailableSemaphores() const { return m_imageAvailableSemaphores; }
+        const std::vector<VkSemaphore>& getRenderFinishedSemaphores() const { return m_renderFinishedSemaphores; }
+        const std::vector<VkFence>& getInFlightFences() const { return m_inFlightFences; }
     private:
         std::shared_ptr<VulkanDeviceContext> m_deviceContext_ptr;
         std::shared_ptr<VulkanSwapchainContext> m_swapchainContext_ptr;

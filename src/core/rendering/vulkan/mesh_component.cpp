@@ -2,22 +2,18 @@
 
 namespace AetherEngine::Rendering {
     MeshComponent::MeshComponent(
-        const std::vector<AetherEngine::Rendering::Objects::Vertex> vertices, 
-        const std::vector<uint16_t> indices, 
-        uint32_t vertexOffset, 
-        uint32_t indexOffset,
+        VkDeviceSize vertexOffset,
+        VkDeviceSize indexOffset,
+        uint32_t indexCount,
         std::shared_ptr<Material> material
-    ) : 
-        m_vertices(vertices), 
-        m_indices(indices), 
-        m_vertexOffset(vertexOffset), 
+    ) :
+        m_vertexOffset(vertexOffset),
         m_indexOffset(indexOffset),
+        m_indexCount(indexCount),
         m_material_ptr(material)
     { }
 
-    MeshComponent::~MeshComponent() {
-        
-    }
+    MeshComponent::~MeshComponent() = default;
 
     void MeshComponent::updateUniformBuffer(const glm::mat4& viewProjMatrix) {
         // glm::mat4 modelMatrix = calculateModelMatrix();

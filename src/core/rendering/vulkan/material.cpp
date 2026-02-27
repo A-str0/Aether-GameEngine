@@ -2,20 +2,16 @@
 
 namespace AetherEngine::Rendering {
     Material::Material(
-        std::weak_ptr<VkDevice> device_ptr, 
-        std::shared_ptr<VkDescriptorSet> descriptorSet_ptr, 
+        VkDescriptorSet descriptorSet, 
         std::shared_ptr<ResourceManagment::Objects::TextureResource> textureResource_ptr
     ) 
-        : m_device_ptr(device_ptr), 
-        m_descriptorSet_ptr(descriptorSet_ptr), 
+        : m_descriptorSet(descriptorSet),
         m_textureResource_ptr(textureResource_ptr)
     {
         
     }
 
-    Material::~Material() {
-        
-    }
+    Material::~Material() = default;
 
     // void Material::setTexture(uint32_t binding, ResourceManagment::Objects::TextureResource* textureResource, VkSampler* sampler) {
     //     m_textureResource_ptr = textureResource;

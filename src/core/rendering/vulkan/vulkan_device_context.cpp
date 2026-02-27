@@ -2,10 +2,13 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <cstring>
+#include <vector>
 
 namespace AetherEngine::Rendering {
-    VulkanDeviceContext::VulkanDeviceContext(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) : m_physicalDevice(physicalDevice) {
-        m_indices = findQueueFamilies(physicalDevice, surface);
+    VulkanDeviceContext::VulkanDeviceContext(VkInstance instance, VkSurfaceKHR surface) {
+        m_physicalDevice = pickPhysicalDevice(instance, surface);
+        m_indices = findQueueFamilies(m_physicalDevice, surface);
         if (m_indices.graphicsFamily == UINT32_MAX || m_indices.presentFamily == UINT32_MAX) {
             throw std::runtime_error("No queue families found for Graphics or Presentation");
         }
@@ -45,9 +48,13 @@ namespace AetherEngine::Rendering {
         deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 
-        const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME};
+        const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
         deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
         deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
+
+        VkPhysicalDeviceFeatures deviceFeatures{};
+        deviceFeatures.samplerAnisotropy = VK_TRUE;
+        deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
         if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &m_device) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create logical device");
@@ -61,8 +68,54 @@ namespace AetherEngine::Rendering {
 
     VulkanDeviceContext::~VulkanDeviceContext() {
         if (m_device != VK_NULL_HANDLE) {
+            vkDeviceWaitIdle(m_device);
             vkDestroyDevice(m_device, nullptr);
         }
+    }
+
+    VkPhysicalDevice VulkanDeviceContext::pickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface) {
+        uint32_t deviceCount = 0;
+        vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+        if (deviceCount == 0) {
+            throw std::runtime_error("No physical devices with Vulkan support found");
+        }
+
+        std::vector<VkPhysicalDevice> devices(deviceCount);
+        vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+
+        for (auto device : devices) {
+            QueueFamilyIndices indices;
+            if (isDeviceSuitable(device, surface, indices)) {
+                return device;
+            }
+        }
+
+        throw std::runtime_error("Failed to find a suitable Vulkan physical device");
+    }
+
+    bool VulkanDeviceContext::isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface, QueueFamilyIndices& outIndices) {
+        outIndices = findQueueFamilies(device, surface);
+        if (outIndices.graphicsFamily == UINT32_MAX || outIndices.presentFamily == UINT32_MAX) {
+            return false;
+        }
+
+        uint32_t extensionCount;
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+        bool swapchainSupported = false;
+        for (const auto& ext : availableExtensions) {
+            if (std::strcmp(ext.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
+                swapchainSupported = true;
+                break;
+            }
+        }
+
+        VkPhysicalDeviceFeatures supportedFeatures;
+        vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+
+        return swapchainSupported && supportedFeatures.samplerAnisotropy;
     }
 
     QueueFamilyIndices VulkanDeviceContext::findQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) {
@@ -104,11 +157,16 @@ namespace AetherEngine::Rendering {
             }
         }
 
+        if (indices.transferFamily == UINT32_MAX) {
+            indices.transferFamily = indices.graphicsFamily;
+        }
+
         return indices;
     }
 
     uint32_t VulkanDeviceContext::getMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
         VkPhysicalDeviceMemoryProperties2 memoryProperties{};
+        memoryProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
         vkGetPhysicalDeviceMemoryProperties2(m_physicalDevice, &memoryProperties);
 
         // TODO: make better way for defining
