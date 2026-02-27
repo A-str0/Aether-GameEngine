@@ -1,5 +1,6 @@
 #include "window_context.h"
 #include <iostream>
+#include <stdexcept>
 
 namespace AetherEngine {
     WindowContext::WindowContext(std::string title, int width, int height) {
@@ -19,7 +20,6 @@ namespace AetherEngine {
     }
 
     WindowContext::~WindowContext() {
-        // TODO: m_surface destroying
         if (m_window) {
             SDL_DestroyWindow(m_window);
         }
@@ -37,24 +37,6 @@ namespace AetherEngine {
         SDL_Vulkan_GetInstanceExtensions(m_window, &extensionCount, extensions.data());
 
         return extensions;
-    }
-
-    SDL_bool WindowContext::recreateSurface(const AetherEngine::Rendering::VulkanContext& context) {
-        if (m_surface != VK_NULL_HANDLE) {
-            vkDestroySurfaceKHR(context.getInstance(), m_surface, nullptr);
-            m_surface = VK_NULL_HANDLE;
-            std::cout << "Old VkSurfaceKHR destroyed" << std::endl;
-        }
-
-        // Create new Surface
-        SDL_bool result = SDL_Vulkan_CreateSurface(m_window, context.getInstance(), &m_surface);
-        if (result) {
-            std::cout << "VkSurfaceKHR successfully created: " << m_surface << std::endl;
-        } else {
-            std::cout << "Failed to create VkSurfaceKHR: " << SDL_GetError() << std::endl;
-        }
-
-        return result;
     }
 
     void WindowContext::handleEvents() {

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstring>
 #include "vulkan_context.h"
 
 namespace AetherEngine::Rendering {
@@ -11,11 +12,16 @@ namespace AetherEngine::Rendering {
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_0;
 
-        // Check for Debug Utils Extension
-        for (const auto& ext : extensions) {
-            if (strcmp(ext, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0) {
+        if (enableValidationLayers) {
+            bool hasDebugUtils = false;
+            for (const auto& ext : extensions) {
+                if (std::strcmp(ext, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0) {
+                    hasDebugUtils = true;
+                    break;
+                }
+            }
+            if (!hasDebugUtils) {
                 extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-                break;
             }
         }
 

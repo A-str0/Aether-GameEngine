@@ -1,7 +1,7 @@
 #include <SDL2/SDL.h>
-#include "../rendering/vulkan/vulkan_context.h"
 #include <SDL2/SDL_vulkan.h>
-#include <vulkan/vulkan.hpp>
+#include <vector>
+#include <string>
 
 #ifndef AETHERENGINE_WINDOWCONTEXT_H 
 #define AETHERENGINE_WINDOWCONTEXT_H
@@ -18,9 +18,6 @@ namespace AetherEngine {
         WindowContext(WindowContext&&) = default;
         WindowContext& operator=(WindowContext&&) = default;
 
-        VkSurfaceKHR getSurface() { return m_surface; } 
-        SDL_bool recreateSurface(const AetherEngine::Rendering::VulkanContext& context);
-
         SDL_Window* getWindow() { return m_window; } 
 
         std::vector<const char*> getRequredExtensions();
@@ -30,7 +27,6 @@ namespace AetherEngine {
         // SDL_Window* getWindow() { return m_window; }
     private:
         SDL_Window* m_window = nullptr;
-        VkSurfaceKHR m_surface = VK_NULL_HANDLE;
     };
 }
 

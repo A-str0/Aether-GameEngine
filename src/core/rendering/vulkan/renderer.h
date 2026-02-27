@@ -1,102 +1,79 @@
 #ifndef AETHERENGINE_RENDERING_RENDERER_H
 #define AETHERENGINE_RENDERING_RENDERER_H
 
+#include <memory>
+#include <vector>
+#include <vulkan/vulkan.hpp>
+
+#include "core/rendering/model.h"
+#include "mesh_component.hpp"
+#include "uniform_buffer_object.hpp"
+#include "vulkan_buffer_manager.hpp"
+#include "vulkan_command_manager.hpp"
 #include "vulkan_device_context.h"
 #include "vulkan_swapchain_context.h"
-#include <vulkan/vulkan.hpp>
-#include <vector>
-#include <memory>
-
-#include "../objects/vertex.h" // TODO: change
 
 namespace AetherEngine::Rendering {
-    class Renderer {
-    public:
-        Renderer(VulkanDeviceContext& device, VulkanSwapchainContext& swapchain, VkSurfaceKHR surface);
-        ~Renderer();
+class Renderer {
+   public:
+    static const uint8_t MAX_FRAMES_IN_FLIGHT = 2;
+    static constexpr uint32_t MAX_MATERIALS = 256;
 
-        Renderer(const Renderer&) = delete;
-        Renderer& operator=(const Renderer&) = delete;
+    Renderer(VulkanDeviceContext& device, VulkanSwapchainContext& swapchain,
+             std::shared_ptr<VulkanBufferManager> bufferManager_ptr,
+             std::shared_ptr<VulkanCommandManager> commandManager_ptr);
+    ~Renderer();
 
-        Renderer(Renderer&&) noexcept = default;
-        Renderer& operator=(Renderer&&) noexcept = default;
+    Renderer(const Renderer&) = delete;
+    Renderer& operator=(const Renderer&) = delete;
 
-        void drawFrame();
-        void updateDescriptorSets(VkImageView imageView);
+    Renderer(Renderer&&) noexcept = default;
+    Renderer& operator=(Renderer&&) noexcept = default;
 
-        VkCommandBuffer beginSingleTimeCommands();
-        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-    private:
-        void createRenderPass();
-        void createRenderPass2();
-        void createShaderModules();
-        void createDescriptorSetLayout();
-        void createGraphicsPipeline();
-        void createFramebuffers();
-        void createVertexBuffer();
-        void createIndexBuffer();
-        void createUniformBuffers();
-        void createDescriptorPool();
-        void createDescriptorSets();
-        void createTransferCommandPool();
-        void createCommandPool();
-        void createCommandBuffers();
-        void createSyncObjects();
-        void createTextureSampler();
+    std::shared_ptr<Material> createMaterial(
+        const std::shared_ptr<ResourceManagment::Objects::TextureResource>& texture);
+    MeshComponent createMesh(const MeshData& meshData, const std::shared_ptr<Material>& material);
+    Model createModel(const std::vector<MeshData>& meshes, const std::shared_ptr<Material>& material);
 
-        void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-        void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
-        void updateUniformBuffer(uint32_t currentImage);
+    void drawFrame(const std::vector<MeshComponent>& meshes);
+    void updateGlobalUniforms(const UniformBufferObject& ubo);
 
-        VulkanDeviceContext& m_deviceContext;
-        VulkanSwapchainContext& m_swapchainContext;
+    void recreateSwapchainResources();
 
-        VkShaderModule m_vertexShaderModule = VK_NULL_HANDLE;
-        VkShaderModule m_fragmentShaderModule = VK_NULL_HANDLE;
+   private:
+    void createRenderPass();
+    void createRenderPass2();
+    void createShaderModules();
+    void createDescriptorSetLayout();
+    void createGraphicsPipeline();
+    void createFramebuffers();
+    void createDescriptorPool();
+    void createUniformBuffer();
 
-        VkRenderPass m_renderPass = VK_NULL_HANDLE;
-        VkPipelineLayout m_graphicsPipelineLayout = VK_NULL_HANDLE;
-        VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
-        VkSampler m_textureSampler;
+    void recordCommandBuffer(const std::vector<MeshComponent>& meshes, VkCommandBuffer commandBuffer,
+                             uint32_t imageIndex);
 
-        VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
-        VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
-        std::vector<VkDescriptorSet> m_descriptorSets;
+    VulkanDeviceContext& m_deviceContext;
+    VulkanSwapchainContext& m_swapchainContext;
+    std::shared_ptr<VulkanBufferManager> m_bufferManager_ptr;
+    std::shared_ptr<VulkanCommandManager> m_commandManager_ptr;
 
-        // TODO: for performance i should use on VkBuffer for Verticies and offset for this
-        // It is even possible to reuse the same chunk of memory for multiple resources if 
-        // they are not used during the same render operations, provided that their data is refreshed.
-        // It calls Aliasing
-        VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
-        VkBuffer m_indexBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory m_indexBufferMemory = VK_NULL_HANDLE;
+    VkShaderModule m_vertexShaderModule = VK_NULL_HANDLE;
+    VkShaderModule m_fragmentShaderModule = VK_NULL_HANDLE;
 
-        std::vector<VkBuffer> m_uniformBuffers;
-        std::vector<VkDeviceMemory> m_uniformBuffersMemory;
-        std::vector<void*> m_uniformBuffersMapped;
+    VkRenderPass m_renderPass = VK_NULL_HANDLE;
+    VkPipelineLayout m_graphicsPipelineLayout = VK_NULL_HANDLE;
+    VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
 
-        VkCommandPool m_commandPool = VK_NULL_HANDLE;
-        VkCommandPool m_transferCommandPool = VK_NULL_HANDLE;
+    VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
 
-        // TODO: maybe not vectors???
-        std::vector<VkFramebuffer> m_frameBuffers;
-        std::vector<VkCommandBuffer> m_commandBuffers;
-        std::vector<VkSemaphore> m_imageAvailableSemaphores;
-        std::vector<VkSemaphore> m_renderFinishedSemaphores;
-        std::vector<VkFence> m_inFlightFences;
+    std::shared_ptr<BufferContext> m_uniformBuffer;
+    void* m_uniformBufferMapped = nullptr;
 
-        // TODO: refactor
-        const std::vector<Objects::Vertex> m_vertices = {
-            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-            {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-            {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
-        };
-        const std::vector<uint16_t> m_indices = {
-            0, 1, 2, 2, 3, 0
-        };
-    };
-}
+    // TODO: maybe not vectors???
+    std::vector<VkFramebuffer> m_frameBuffers;
+};
+}  // namespace AetherEngine::Rendering
 
 #endif

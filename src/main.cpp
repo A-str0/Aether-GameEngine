@@ -1,72 +1,83 @@
-#include "core/window_managment/window_context.h"
+#include <SDL2/SDL.h>
+
+#include <cmath>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+#include "core/config/paths.h"
+#include "core/rendering/render_scene.h"
+#include "core/rendering/vulkan/renderer.h"
 #include "core/rendering/vulkan/vulkan_context.h"
 #include "core/rendering/vulkan/vulkan_device_context.h"
+#include "core/rendering/vulkan/vulkan_surface_context.h"
 #include "core/rendering/vulkan/vulkan_swapchain_context.h"
-#include "core/rendering/vulkan/renderer.h"
 #include "core/resource_managment/resource_manager.h"
-
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_vulkan.h>
-
-#include <stdexcept>
-#include <vector>
-#include <string>
+#include "core/window_managment/window_context.h"
 
 int main() {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         throw std::runtime_error("Failed to initialize SDL: " + std::string(SDL_GetError()));
     }
 
-    AetherEngine::WindowContext windowContext {"AetherEngine", 800, 600};
-    std::vector<const char*> extensions = windowContext.getRequredExtensions();
-    AetherEngine::Rendering::VulkanContext vulkanContext {extensions};
-    windowContext.recreateSurface(vulkanContext);
+    {
+        AetherEngine::WindowContext windowContext{"AetherEngine", 800, 600};
+        std::vector<const char*> extensions = windowContext.getRequredExtensions();
+        AetherEngine::Rendering::VulkanContext vulkanContext{extensions};
+        AetherEngine::Rendering::VulkanSurfaceContext surfaceContext{vulkanContext.getInstance(),
+                                                                     windowContext.getWindow()};
 
-    // TODO: refactor
-    uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(vulkanContext.getInstance(), &deviceCount, nullptr);
-    if (deviceCount == 0) {
-        throw std::runtime_error("No physical devices with Vulkan support found");
-    }
-    std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
-    vkEnumeratePhysicalDevices(vulkanContext.getInstance(), &deviceCount, physicalDevices.data());
+        auto deviceContext_ptr = std::make_shared<AetherEngine::Rendering::VulkanDeviceContext>(
+            vulkanContext.getInstance(), surfaceContext.getSurface());
+        auto swapchainContext_ptr = std::make_shared<AetherEngine::Rendering::VulkanSwapchainContext>(
+            *deviceContext_ptr, surfaceContext.getSurface(), windowContext.getWindow());
+        auto commandManager_ptr = std::make_shared<AetherEngine::Rendering::VulkanCommandManager>(
+            deviceContext_ptr, swapchainContext_ptr);
+        auto bufferManager_ptr = std::make_shared<AetherEngine::Rendering::VulkanBufferManager>(
+            deviceContext_ptr, commandManager_ptr);
 
-    VkPhysicalDevice physicalDevice{};
-    for (uint32_t i = 0; i < deviceCount; ++i) {
-        physicalDevice = physicalDevices[i];
+        AetherEngine::Rendering::Renderer renderer{*deviceContext_ptr, *swapchainContext_ptr,
+                                                   bufferManager_ptr, commandManager_ptr};
+        AetherEngine::ResourceManagment::ResourceManager resourceManager{
+            *deviceContext_ptr, *swapchainContext_ptr, bufferManager_ptr, commandManager_ptr};
 
-        VkPhysicalDeviceFeatures supportedFeatures;
-        vkGetPhysicalDeviceFeatures(physicalDevice, &supportedFeatures);
+        auto texture = resourceManager.loadTexture(AetherEngine::Config::texturePath("tex.jpg").string());
+        auto material = renderer.createMaterial(texture);
 
-        if (supportedFeatures.samplerAnisotropy) {
-            break;
+        AetherEngine::Rendering::MeshData quadMesh{
+            .vertices = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+                         {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+                         {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+                         {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}},
+            .indices = {0, 1, 2, 2, 3, 0}};
+
+        AetherEngine::Rendering::RenderScene scene;
+        auto model = renderer.createModel({quadMesh}, material);
+        scene.addModel(model);
+
+        AetherEngine::UniformBufferObject ubo{};
+        ubo.model = glm::mat4(1.0f);
+        ubo.view = glm::mat4(1.0f);
+        ubo.proj = glm::mat4(1.0f);
+        renderer.updateGlobalUniforms(ubo);
+
+        bool running = true;
+        SDL_Event event;
+        while (running) {
+            while (SDL_PollEvent(&event)) {
+                if (event.type == SDL_QUIT) {
+                    running = false;
+                }
+            }
+            float timeSeconds = static_cast<float>(SDL_GetTicks()) / 1000.0f;
+            float x = std::sin(timeSeconds) * 0.5f;
+            ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(x, 0.0f, 0.0f));
+            renderer.updateGlobalUniforms(ubo);
+            renderer.drawFrame(scene.getMeshes());
         }
     }
-
-    AetherEngine::Rendering::VulkanDeviceContext deviceContext {physicalDevice, windowContext.getSurface()};
-    AetherEngine::Rendering::VulkanSwapchainContext swapchainContext {deviceContext, windowContext};
-    AetherEngine::Rendering::Renderer renderer {deviceContext, swapchainContext, windowContext.getSurface()};
-    AetherEngine::ResourceManagment::ResourceManager resourceManager {deviceContext, swapchainContext, renderer};
-
-    auto texture = resourceManager.loadTexture("../../../src/core/rendering/textures/tex.jpg");
-    renderer.updateDescriptorSets(texture->imageView);
-
-    bool running = true;
-    SDL_Event event;
-    while (running) {
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                running = false;
-            } 
-            // else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
-            //     recreateSwapchain();
-            // }
-        }
-        renderer.drawFrame();
-    }
-
-    // TODO: change?
-    texture->cleanup(deviceContext.getDevice());
 
     SDL_Quit();
     return 0;

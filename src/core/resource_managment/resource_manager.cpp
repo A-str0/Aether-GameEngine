@@ -4,36 +4,46 @@
 #include <stb/stb_image.h>
 
 #include <fstream>
+#include <cstring>
+#include <filesystem>
 #include "resource_manager.h"
 
 namespace AetherEngine::ResourceManagment {
     std::shared_ptr<Objects::TextureResource> ResourceManager::loadTexture(std::string filename) {
+        std::string cacheKey = std::filesystem::absolute(filename).string();
+        if (auto cached = m_textureCache.find(cacheKey); cached != m_textureCache.end()) {
+            if (auto existing = cached->second.lock()) {
+                return existing;
+            }
+        }
+
         int width, height, channels;
-        // stbi_uc* pixels = stbi_load("../../../src/core/rendering/textures/tex.jpg", &width, &height, &channels, STBI_rgb_alpha);
         stbi_uc* pixels = stbi_load(filename.data(), &width, &height, &channels, STBI_rgb_alpha);
-        VkDeviceSize imageSize = width * height * 4; // is it??
+        VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height) * 4;
 
         if (!pixels) {
             throw std::runtime_error("Failed to load texture image!");
         }
 
         auto texture = std::make_shared<Objects::TextureResource>();
+        texture->device = m_deviceContext.getDevice();
         
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-
-        m_deviceContext.createBuffer(
+        auto buffer = m_bufferManager_ptr->createBuffer(
             imageSize,
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-            stagingBuffer, 
-            stagingBufferMemory
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
         );
 
+        if (buffer->memory == VK_NULL_HANDLE) {
+            throw std::runtime_error("Buffer memory is null!");
+        }
+
         void* data;
-        vkMapMemory(m_deviceContext.getDevice(), stagingBufferMemory, 0, imageSize, 0, &data);
-            memcpy(data, pixels, static_cast<size_t>(imageSize));
-        vkUnmapMemory(m_deviceContext.getDevice(), stagingBufferMemory);
+        if (vkMapMemory(m_deviceContext.getDevice(), buffer->memory, 0, buffer->size, 0, &data) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to map buffer memory!");
+        }
+        memcpy(data, pixels, static_cast<size_t>(imageSize));
+        vkUnmapMemory(m_deviceContext.getDevice(), buffer->memory);
 
         // func_ptr(imageData);
         stbi_image_free(pixels);
@@ -72,21 +82,21 @@ namespace AetherEngine::ResourceManagment {
         }
 
         // Set Memory
-        vkBindImageMemory(m_deviceContext.getDevice(), texture->image, texture->memory, 0);
+        if (vkBindImageMemory(m_deviceContext.getDevice(), texture->image, texture->memory, 0) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to bind image memory!");
+        }
 
         transitionImageLayout(texture->image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        copyBufferToImage(stagingBuffer, texture->image, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+        copyBufferToImage(buffer->buffer, texture->image, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
         transitionImageLayout(texture->image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-        transitionImageLayout(texture->image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-        vkDestroyBuffer(m_deviceContext.getDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(m_deviceContext.getDevice(), stagingBufferMemory, nullptr);
-
-        m_textureCache[filename] = std::weak_ptr<Objects::TextureResource>(texture);
+        m_textureCache[cacheKey] = std::weak_ptr<Objects::TextureResource>(texture);
 
         // Set ImageView
         texture->imageView = m_swapchainContext.createImageView(texture->image, VK_FORMAT_R8G8B8A8_SRGB); // TODO: custom format
+
+        // Create Sampler
+        texture->sampler = createSampler();
 
         return texture;
     }
@@ -99,8 +109,38 @@ namespace AetherEngine::ResourceManagment {
         stbi_image_free(pixels);
     }
 
-     void ResourceManager::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
-        VkCommandBuffer commandBuffer = m_renderer.beginSingleTimeCommands();
+    // shared_ptr is it??
+    VkSampler ResourceManager::createSampler() {
+        VkSamplerCreateInfo samplerInfo{};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_TRUE;
+
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(m_deviceContext.getPhysicalDevice(), &properties);
+        samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+
+        VkSampler sampler = VK_NULL_HANDLE;
+        if (vkCreateSampler(m_deviceContext.getDevice(), &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create texture sampler!");
+        }
+        return sampler;
+    }
+
+    void ResourceManager::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
+        VkCommandBuffer commandBuffer = m_commandManager_ptr->beginSingleTimeCommands();
 
         VkImageMemoryBarrier barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -145,11 +185,11 @@ namespace AetherEngine::ResourceManagment {
             1, &barrier
         );
 
-        m_renderer.endSingleTimeCommands(commandBuffer);
+        m_commandManager_ptr->endSingleTimeCommands(commandBuffer);
     }
 
     void ResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
-        VkCommandBuffer commandBuffer = m_renderer.beginSingleTimeCommands();
+        VkCommandBuffer commandBuffer = m_commandManager_ptr->beginSingleTimeCommands();
 
         VkBufferImageCopy region{};
         region.bufferOffset = 0;
@@ -177,6 +217,6 @@ namespace AetherEngine::ResourceManagment {
             &region
         );
 
-        m_renderer.endSingleTimeCommands(commandBuffer);
+       m_commandManager_ptr->endSingleTimeCommands(commandBuffer);
     }
 }

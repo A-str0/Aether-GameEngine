@@ -1,15 +1,19 @@
 #ifndef AETHERENGINE_RENDERING_DEVICECONTEXT_H
 #define AETHERENGINE_RENDERING_DEVICECONTEXT_H
 
+#include <memory>
+
 #include <vulkan/vulkan.hpp>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
-#include "structs.h"
+
+#include "queue_family_indices.h"
+#include "buffer_context.hpp"
 
 namespace AetherEngine::Rendering {
     class VulkanDeviceContext {
     public:
-        VulkanDeviceContext(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface);
+        VulkanDeviceContext(VkInstance instance, VkSurfaceKHR surface);
         ~VulkanDeviceContext();
 
         VulkanDeviceContext(const VulkanDeviceContext&) = delete;
@@ -28,10 +32,10 @@ namespace AetherEngine::Rendering {
         uint32_t getTransferFamily() const { return m_indices.transferFamily; }
         QueueFamilyIndices getQueueFamilyIndicies() const { return m_indices; }
 
-        u_int32_t getMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-
-        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+        uint32_t getMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     private:
+        VkPhysicalDevice pickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface);
+        bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface, QueueFamilyIndices& outIndices);
         QueueFamilyIndices findQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface);
 
         VkDevice m_device = VK_NULL_HANDLE;

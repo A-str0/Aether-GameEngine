@@ -5,7 +5,15 @@
 #include <iostream>
 
 namespace AetherEngine::Rendering {
-    VulkanSwapchainContext::VulkanSwapchainContext(VulkanDeviceContext& deviceContext, WindowContext& windowContext) : m_deviceContext(&deviceContext), m_windowContext(&windowContext) {
+    VulkanSwapchainContext::VulkanSwapchainContext(
+        VulkanDeviceContext& deviceContext,
+        VkSurfaceKHR surface,
+        SDL_Window* window
+    ) :
+        m_deviceContext(&deviceContext),
+        m_window(window),
+        m_surface(surface)
+    {
         createSwapchain();
         createImageViews();
     }
@@ -50,8 +58,10 @@ namespace AetherEngine::Rendering {
                 vkDestroyImageView(m_deviceContext->getDevice(), imageView, nullptr);
             }
         }
+        m_imageViews.clear();
         if (m_swapchain != VK_NULL_HANDLE) {
             vkDestroySwapchainKHR(m_deviceContext->getDevice(), m_swapchain, nullptr);
+            m_swapchain = VK_NULL_HANDLE;
         }
     }
 
@@ -79,8 +89,8 @@ namespace AetherEngine::Rendering {
     void VulkanSwapchainContext::createSwapchain() {
         VkPhysicalDevice physicalDevice = m_deviceContext->getPhysicalDevice();
         VkDevice device = m_deviceContext->getDevice();
-        VkSurfaceKHR surface = m_windowContext->getSurface();
-        SDL_Window *window = m_windowContext->getWindow();
+        VkSurfaceKHR surface = m_surface;
+        SDL_Window *window = m_window;
 
         // TODO: VkSurfaceCapabilities2KHR capabilities
         VkSurfaceCapabilitiesKHR capabilities;
@@ -115,8 +125,11 @@ namespace AetherEngine::Rendering {
         VkSwapchainCreateInfoKHR createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
         createInfo.surface = surface;
-        createInfo.minImageCount = capabilities.minImageCount + 1;
-        // createInfo.minImageCount = std::clamp(capabilities.minImageCount + 1, capabilities.minImageCount, capabilities.maxImageCount);
+        uint32_t imageCount = capabilities.minImageCount + 1;
+        if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount) {
+            imageCount = capabilities.maxImageCount;
+        }
+        createInfo.minImageCount = imageCount;
         createInfo.imageFormat = surfaceFormat.format;
         createInfo.imageColorSpace = surfaceFormat.colorSpace;
         createInfo.imageExtent = m_extent;
