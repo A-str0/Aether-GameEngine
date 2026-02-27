@@ -1,6 +1,8 @@
 #include <SDL2/SDL.h>
 
+#include <cmath>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -69,6 +71,10 @@ int main() {
                     running = false;
                 }
             }
+            float timeSeconds = static_cast<float>(SDL_GetTicks()) / 1000.0f;
+            float x = std::sin(timeSeconds) * 0.5f;
+            ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(x, 0.0f, 0.0f));
+            renderer.updateGlobalUniforms(ubo);
             renderer.drawFrame(scene.getMeshes());
         }
     }
